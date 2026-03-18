@@ -179,6 +179,18 @@ PowerShell-Module werden bei Bedarf automatisch installiert:
 | `ImportExcel` | Excel-Export |
 | `SimplySql` | PostgreSQL-Anbindung |
 
+### Firewall-Freigaben fuer PowerShell-Module
+
+Fuer die automatische Installation der Module muessen folgende URLs (HTTPS, Port 443) erreichbar sein:
+
+| URL | Zweck |
+|---|---|
+| `www.powershellgallery.com` | Modul-Metadaten (ImportExcel, SimplySql) |
+| `psg-prod-eastus.azureedge.net` | Modul-Download (NuGet-Pakete) |
+| `onegetcdn.azureedge.net` | NuGet Package Provider |
+| `nuget.org` | NuGet Registry |
+| `api.nuget.org` | NuGet API |
+
 ### Credentials speichern (einmalig)
 
 Credentials werden mit Windows DPAPI verschlüsselt und können nur vom selben Benutzer auf derselben Maschine entschlüsselt werden.

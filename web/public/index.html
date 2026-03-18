@@ -11,7 +11,12 @@
     <span class="brand">Accounting</span>
     <nav>
       <a href="/" class="active">Dashboard</a>
-      <a href="/vms.html">VMs</a>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle">Rohdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/vms.html">VMs</a>
+        </div>
+      </div>
     </nav>
   </div>
 
@@ -20,19 +25,22 @@
       <h1>Dashboard</h1>
     </div>
 
-    <div class="card-grid">
-      <a href="/vms.html" class="card" style="text-decoration:none;color:inherit;">
-        <div class="card-icon">&#x1F5A5;</div>
-        <h2>Virtuelle Maschinen</h2>
-        <p>VM-Inventar aus VeeamOne. Hostname, IP, CPU, RAM, Storage und Power State — filterbar nach Exportmonat.</p>
-        <span class="card-link">Zur Übersicht &rarr;</span>
-      </a>
+    <div class="card-group">
+      <h2 class="card-group-title">Rohdaten</h2>
+      <div class="card-grid">
+        <a href="/vms.html" class="card" style="text-decoration:none;color:inherit;">
+          <div class="card-icon">&#x1F5A5;</div>
+          <h2>Virtuelle Maschinen</h2>
+          <p>VM-Inventar aus VeeamOne. Hostname, IP, CPU, RAM, Storage und Power State — filterbar nach Exportmonat.</p>
+          <span class="card-link">Zur Übersicht &rarr;</span>
+        </a>
 
-      <div class="card" style="opacity:0.5;">
-        <div class="card-icon">&#x1F4E6;</div>
-        <h2>Weitere Module</h2>
-        <p>Zusätzliche Abrechnungs&shy;bereiche werden hier erscheinen, sobald weitere Export-Skripte eingebunden sind.</p>
-        <span class="card-link" style="color:var(--text-muted);">Demnächst verfügbar</span>
+        <div class="card" style="opacity:0.5;">
+          <div class="card-icon">&#x1F4E6;</div>
+          <h2>Weitere Module</h2>
+          <p>Zusätzliche Abrechnungs&shy;bereiche werden hier erscheinen, sobald weitere Export-Skripte eingebunden sind.</p>
+          <span class="card-link" style="color:var(--text-muted);">Demnächst verfügbar</span>
+        </div>
       </div>
     </div>
   </div>
