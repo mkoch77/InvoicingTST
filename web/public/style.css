@@ -196,7 +196,8 @@ tbody tr:hover { background: #1a1a1a; }
 .state-off { color: var(--text-muted); }
 .state-suspended { color: var(--warning); font-weight: 600; }
 
-td.ip-cell { white-space: normal; max-width: 200px; }
+td.ip-cell { white-space: normal; max-width: 160px; }
+td.os-cell { white-space: normal; max-width: 180px; }
 
 /* ── Dashboard Cards ── */
 .card-grid {

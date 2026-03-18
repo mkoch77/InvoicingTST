@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VMs – Accounting</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=2">
 </head>
 <body>
   <div class="navbar">
@@ -34,22 +34,23 @@
         <thead>
           <tr>
             <th data-key="hostname">Hostname <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="dns_name">DNS Name <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="ip_addresses">IP Address <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="operating_system">Operating System <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="dns_name">DNS <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="ip_addresses">IP <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="operating_system">OS <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="vcpu">vCPU <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="vram_mb">vRAM (MB) <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="used_storage_gb">Used Storage (GB) <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="provisioned_storage_gb">Provisioned Storage (GB) <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="power_state">Power State <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="vram_mb">RAM (MB) <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="used_storage_gb">Used (GB) <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="provisioned_storage_gb">Prov. (GB) <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="power_state">State <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="exported_at">Timestamp <span class="sort-arrow">&#x25B2;</span></th>
           </tr>
         </thead>
         <tbody id="vm-rows">
-          <tr><td colspan="9" class="empty">Daten werden geladen…</td></tr>
+          <tr><td colspan="10" class="empty">Daten werden geladen…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
-  <script src="/vms.js"></script>
+  <script src="/vms.js?v=2"></script>
 </body>
 </html>

@@ -728,7 +728,7 @@ if ("Postgres" -in $OutputTarget) {
     $pgUser = $pgCred.UserName
     $pgPass = $pgCred.GetNetworkCredential().Password
     $pgConnString = "Host=$PgHost;Port=$PgPort;Database=$PgDatabase;Username=$pgUser;Password=$pgPass"
-    Write-Log "PostgreSQL target: $PgHost:$PgPort/$PgDatabase (user: $pgUser)" -Level INFO -ForegroundColor Cyan
+    Write-Log "PostgreSQL target: ${PgHost}:${PgPort}/${PgDatabase} (user: ${pgUser})" -Level INFO -ForegroundColor Cyan
 }
 
 # Resolve credentials: explicit param > credential file > interactive prompt

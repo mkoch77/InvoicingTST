@@ -30,14 +30,14 @@ async function loadMonths() {
 async function loadVMs() {
   const month = monthSelect.value;
   const url = month ? `/api/vms.php?month=${month}` : '/api/vms.php';
-  vmRows.innerHTML = '<tr><td colspan="9" class="empty">Laden…</td></tr>';
+  vmRows.innerHTML = '<tr><td colspan="10" class="empty">Laden…</td></tr>';
 
   try {
     const res = await fetch(url);
     allVMs = await res.json();
     renderTable();
   } catch (err) {
-    vmRows.innerHTML = `<tr><td colspan="9" class="empty">Fehler: ${esc(err.message)}</td></tr>`;
+    vmRows.innerHTML = `<tr><td colspan="10" class="empty">Fehler: ${esc(err.message)}</td></tr>`;
   }
 }
 
@@ -83,7 +83,7 @@ function renderTable() {
   vmCount.textContent = `${sorted.length} von ${allVMs.length} VMs`;
 
   if (sorted.length === 0) {
-    vmRows.innerHTML = '<tr><td colspan="9" class="empty">Keine VMs gefunden.</td></tr>';
+    vmRows.innerHTML = '<tr><td colspan="10" class="empty">Keine VMs gefunden.</td></tr>';
     return;
   }
 
@@ -100,12 +100,13 @@ function renderTable() {
       <td>${esc(vm.hostname)}</td>
       <td>${esc(vm.dns_name || '')}</td>
       <td class="ip-cell">${esc(ips)}</td>
-      <td>${esc(vm.operating_system || '')}</td>
+      <td class="os-cell">${esc(vm.operating_system || '')}</td>
       <td>${vm.vcpu ?? ''}</td>
       <td>${vm.vram_mb ?? ''}</td>
       <td>${vm.used_storage_gb ?? ''}</td>
       <td>${vm.provisioned_storage_gb ?? ''}</td>
       <td class="${stateClass}">${esc(vm.power_state || '')}</td>
+      <td>${esc(formatDate(vm.exported_at))}</td>
     `;
     vmRows.appendChild(tr);
   }
@@ -146,6 +147,15 @@ document.getElementById('export-btn').addEventListener('click', () => {
   const url = month ? `/api/export.php?month=${month}` : '/api/export.php';
   window.location.href = url;
 });
+
+function formatDate(val) {
+  if (!val) return '';
+  // PostgreSQL gibt "2026-02-15 00:00:00+00" zurueck — in ISO umwandeln
+  const iso = val.replace(' ', 'T').replace(/\+(\d{2})$/, '+$1:00');
+  const d = new Date(iso);
+  if (isNaN(d)) return val;
+  return d.toLocaleString('de-DE');
+}
 
 function esc(str) {
   const d = document.createElement('div');
