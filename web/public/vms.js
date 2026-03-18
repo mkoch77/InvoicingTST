@@ -10,7 +10,7 @@ let sortDir = 1; // 1 = asc, -1 = desc
 // ── Months dropdown ──
 async function loadMonths() {
   try {
-    const res = await fetch('/api/months');
+    const res = await fetch('/api/months.php');
     const months = await res.json();
     months.forEach(m => {
       const opt = document.createElement('option');
@@ -29,7 +29,7 @@ async function loadMonths() {
 // ── Fetch VM data ──
 async function loadVMs() {
   const month = monthSelect.value;
-  const url = month ? `/api/vms?month=${month}` : '/api/vms';
+  const url = month ? `/api/vms.php?month=${month}` : '/api/vms.php';
   vmRows.innerHTML = '<tr><td colspan="9" class="empty">Laden…</td></tr>';
 
   try {
@@ -143,7 +143,7 @@ searchInput.addEventListener('input', () => {
 // ── Excel export ──
 document.getElementById('export-btn').addEventListener('click', () => {
   const month = monthSelect.value;
-  const url = month ? `/api/vms/export?month=${month}` : '/api/vms/export';
+  const url = month ? `/api/export.php?month=${month}` : '/api/export.php';
   window.location.href = url;
 });
 

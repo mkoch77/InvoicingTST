@@ -23,9 +23,8 @@ services:
       PGUSER: ${PG_USER:-accounting}
       PGPASSWORD: ${PG_PASSWORD}
       PGDATABASE: ${PG_DATABASE:-InvoicingAssets}
-      PORT: 3000
     expose:
-      - "3000"
+      - "80"
     depends_on:
       - postgres
 
