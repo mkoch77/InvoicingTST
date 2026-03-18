@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VMs – Accounting</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="navbar">
+    <span class="brand">Accounting</span>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/vms.html" class="active">VMs</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Virtuelle Maschinen</h1>
+      <div class="controls">
+        <label for="month-select">Monat:</label>
+        <select id="month-select">
+          <option value="">Alle</option>
+        </select>
+        <input type="text" id="search-input" placeholder="Suchen…" />
+        <span id="vm-count" class="count"></span>
+        <button id="export-btn" class="btn" title="Als Excel exportieren">&#x2B07; Excel</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="hostname">Hostname <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="dns_name">DNS Name <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="ip_addresses">IP Address <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="operating_system">Operating System <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="vcpu">vCPU <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="vram_mb">vRAM (MB) <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="used_storage_gb">Used Storage (GB) <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="provisioned_storage_gb">Provisioned Storage (GB) <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="power_state">Power State <span class="sort-arrow">&#x25B2;</span></th>
+          </tr>
+        </thead>
+        <tbody id="vm-rows">
+          <tr><td colspan="9" class="empty">Daten werden geladen…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script src="/vms.js"></script>
+</body>
+</html>

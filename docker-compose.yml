@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: accounting-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER:-accounting}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD muss in .env gesetzt sein}
+      POSTGRES_DB: ${PG_DATABASE:-InvoicingAssets}
+    ports:
+      - "5432:5432"
+    volumes:
+      - accounting-pgdata:/var/lib/postgresql/data
+      - ./install-postgres-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+  web:
+    build: ./web
+    container_name: accounting-web
+    restart: unless-stopped
+    environment:
+      PGHOST: accounting-postgres
+      PGPORT: 5432
+      PGUSER: ${PG_USER:-accounting}
+      PGPASSWORD: ${PG_PASSWORD}
+      PGDATABASE: ${PG_DATABASE:-InvoicingAssets}
+      PORT: 3000
+    expose:
+      - "3000"
+    depends_on:
+      - postgres
+
+  nginx:
+    image: nginx:alpine
+    container_name: accounting-nginx
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      - web
+
+  # Let's Encrypt: einkommentieren sobald Domain vorhanden
+  # certbot:
+  #   image: certbot/certbot
+  #   container_name: accounting-certbot
+  #   volumes:
+  #     - ./nginx/certs:/etc/letsencrypt
+  #     - certbot-webroot:/var/www/certbot
+  #   command: certonly --webroot -w /var/www/certbot --email admin@example.com -d example.com --agree-tos --no-eff-email
+
+volumes:
+  accounting-pgdata:
+  certbot-webroot:
