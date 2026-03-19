@@ -51,13 +51,13 @@ function renderUserMenu() {
 
   const menu = document.createElement('div');
   menu.id = 'user-menu';
-  menu.className = 'nav-dropdown user-menu';
+  menu.className = 'user-menu';
   menu.innerHTML = `
-    <a href="#" class="nav-dropdown-toggle user-toggle">
+    <button class="user-toggle" id="user-toggle-btn" type="button">
       <span class="user-avatar">${esc(initial)}</span>
       <span class="user-name">${esc(currentUser.display_name || currentUser.username)}</span>
-    </a>
-    <div class="nav-dropdown-menu user-dropdown-menu">
+    </button>
+    <div class="user-dropdown-menu" id="user-dropdown">
       <div class="user-dropdown-header">
         <strong>${esc(currentUser.display_name || currentUser.username)}</strong>
         <span class="user-role-badge">${esc(currentUser.role)}</span>
@@ -70,6 +70,27 @@ function renderUserMenu() {
   `;
 
   navbar.appendChild(menu);
+
+  // Click-based toggle
+  const toggleBtn = document.getElementById('user-toggle-btn');
+  const dropdown = document.getElementById('user-dropdown');
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+
+  // Close on click outside
+  document.addEventListener('click', (e) => {
+    if (!menu.contains(e.target)) {
+      dropdown.classList.remove('open');
+    }
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') dropdown.classList.remove('open');
+  });
 
   document.getElementById('logout-btn').addEventListener('click', async (e) => {
     e.preventDefault();

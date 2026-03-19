@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kundenkürzel – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=6">
+</head>
+<body>
+  <div class="navbar">
+    <span class="brand">Accounting</span>
+    <nav>
+      <a href="/">Dashboard</a>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle">Rohdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/vms.html">VMs</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle active">Stammdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/stammdaten/customers.html" class="active">Kundenkürzel</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Kundenkürzel</h1>
+      <div class="controls">
+        <input type="text" id="search-input" placeholder="Suchen…" />
+        <span id="customer-count" class="count"></span>
+        <button class="btn" id="add-btn">+ Neues Kürzel</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Kunde</th>
+            <th>Status</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal" style="display:none;">
+      <div class="modal-content" style="max-width:400px;">
+        <h2 id="modal-title">Kürzel anlegen</h2>
+        <div class="form-group">
+          <label for="m-code">Code (3 Zeichen) *</label>
+          <input type="text" id="m-code" maxlength="5" style="text-transform:uppercase;" />
+        </div>
+        <div class="form-group">
+          <label for="m-name">Kundenname *</label>
+          <input type="text" id="m-name" />
+        </div>
+        <div id="modal-error" class="login-error" style="display:none;"></div>
+        <div class="modal-actions">
+          <button class="btn" id="modal-save">Speichern</button>
+          <button class="btn btn-secondary" id="modal-cancel">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=6"></script>
+  <script>
+    let customers = [];
+    let editId = null;
+
+    async function load() {
+      const res = await fetch('/api/customers.php');
+      customers = await res.json();
+      render();
+    }
+
+    function render() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      let filtered = customers;
+      if (query) {
+        filtered = customers.filter(c =>
+          c.code.toLowerCase().includes(query) || c.name.toLowerCase().includes(query)
+        );
+      }
+
+      document.getElementById('customer-count').textContent = `${filtered.length} Kürzel`;
+      const tbody = document.getElementById('rows');
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">Keine Kürzel gefunden.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      filtered.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${esc(c.code)}</strong></td>
+          <td>${esc(c.name)}</td>
+          <td>${c.is_active ? '<span class="state-on">Aktiv</span>' : '<span class="state-off">Inaktiv</span>'}</td>
+          <td>
+            <button class="btn-sm" onclick="edit(${c.id})">Bearbeiten</button>
+            <button class="btn-sm btn-danger" onclick="del(${c.id}, '${esc(c.code)}')">Löschen</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function openModal(title, c) {
+      editId = c ? c.id : null;
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('m-code').value = c?.code || '';
+      document.getElementById('m-code').disabled = !!c;
+      document.getElementById('m-name').value = c?.name || '';
+      document.getElementById('modal-error').style.display = 'none';
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    document.getElementById('add-btn').addEventListener('click', () => openModal('Kürzel anlegen', null));
+    document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('modal').style.display = 'none');
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') e.target.style.display = 'none'; });
+
+    function edit(id) {
+      const c = customers.find(x => x.id === id);
+      if (c) openModal('Kürzel bearbeiten', c);
+    }
+
+    async function del(id, code) {
+      if (!confirm(`Kürzel "${code}" wirklich löschen?`)) return;
+      await fetch('/api/customers.php?id=' + id, { method: 'DELETE' });
+      load();
+    }
+
+    document.getElementById('modal-save').addEventListener('click', async () => {
+      const errEl = document.getElementById('modal-error');
+      const body = {
+        code: document.getElementById('m-code').value,
+        name: document.getElementById('m-name').value,
+      };
+      if (editId) body.id = editId;
+
+      const res = await fetch('/api/customers.php', {
+        method: editId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        errEl.textContent = data.error || 'Fehler';
+        errEl.style.display = 'block';
+        return;
+      }
+      document.getElementById('modal').style.display = 'none';
+      load();
+    });
+
+    document.getElementById('search-input').addEventListener('input', () => render());
+    load();
+  </script>
+</body>
+</html>

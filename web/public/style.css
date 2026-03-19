@@ -281,6 +281,27 @@ tbody tr:hover { background: var(--row-hover); }
 
 td.ip-cell { white-space: normal; max-width: 160px; }
 td.os-cell { white-space: normal; max-width: 180px; }
+td.customer-cell { white-space: nowrap; }
+
+.customer-assign {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-family: inherit;
+  max-width: 180px;
+  outline: none;
+}
+
+.customer-assign:focus {
+  border-color: var(--accent);
+}
+
+.customer-assign:disabled {
+  opacity: 0.5;
+}
 
 /* ── Pagination ── */
 .pagination {
@@ -632,15 +653,29 @@ a.stat-row:hover {
   text-decoration: none;
 }
 
-/* ── User Menu (navbar) ── */
+/* ── User Menu (navbar, click-based) ── */
 .user-menu {
   margin-left: auto;
+  position: relative;
 }
 
 .user-toggle {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.user-toggle:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .user-avatar {
@@ -661,9 +696,36 @@ a.stat-row:hover {
 }
 
 .user-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.35rem);
   right: 0;
-  left: auto;
-  min-width: 200px;
+  min-width: 220px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 200;
+}
+
+.user-dropdown-menu.open {
+  display: block;
+}
+
+.user-dropdown-menu a {
+  display: block;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+.user-dropdown-menu a:hover {
+  background: var(--row-hover);
+  color: var(--text);
+  text-decoration: none;
 }
 
 .user-dropdown-header {
@@ -683,7 +745,7 @@ a.stat-row:hover {
   font-size: 0.7rem;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;

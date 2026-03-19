@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VMs – Accounting</title>
-  <link rel="stylesheet" href="/style.css?v=5">
+  <link rel="stylesheet" href="/style.css?v=6">
 </head>
 <body>
   <div class="navbar">
@@ -15,6 +15,12 @@
         <a href="#" class="nav-dropdown-toggle active">Rohdaten</a>
         <div class="nav-dropdown-menu">
           <a href="/vms.html" class="active">VMs</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle">Stammdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/stammdaten/customers.html">Kundenkürzel</a>
         </div>
       </div>
     </nav>
@@ -42,6 +48,12 @@
           <option value="all">Alle</option>
         </select>
         <span id="vm-count" class="count"></span>
+        <label for="customer-select">Kunde:</label>
+        <select id="customer-select">
+          <option value="">Alle</option>
+          <option value="__none__">Nicht zugeordnet</option>
+        </select>
+        <button id="assign-btn" class="btn" title="Kundenzuordnung automatisch durchführen">Zuordnung</button>
         <button id="export-btn" class="btn" title="Als Excel exportieren">&#x2B07; Excel</button>
       </div>
     </div>
@@ -50,6 +62,7 @@
       <table>
         <thead>
           <tr>
+            <th data-key="customer_name">Kunde <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="hostname">Hostname <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="dns_name">DNS <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="ip_addresses">IP <span class="sort-arrow">&#x25B2;</span></th>
@@ -63,13 +76,13 @@
           </tr>
         </thead>
         <tbody id="vm-rows">
-          <tr><td colspan="10" class="empty">Daten werden geladen…</td></tr>
+          <tr><td colspan="11" class="empty">Daten werden geladen…</td></tr>
         </tbody>
       </table>
     </div>
     <div id="pagination" class="pagination"></div>
   </div>
-  <script src="/app.js?v=5"></script>
-  <script src="/vms.js?v=5"></script>
+  <script src="/app.js?v=6"></script>
+  <script src="/vms.js?v=6"></script>
 </body>
 </html>

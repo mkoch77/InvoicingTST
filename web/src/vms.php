@@ -29,12 +29,16 @@ function fetchVMs(?string $month = null): array
             v.provisioned_storage_gb,
             ps.name AS power_state,
             v.exported_at,
+            v.customer_id,
+            c.code AS customer_code,
+            c.name AS customer_name,
             ARRAY_AGG(ip.ip_address::TEXT ORDER BY ip.ip_address)
                 FILTER (WHERE ip.ip_address IS NOT NULL) AS ip_addresses
         FROM vm v
         LEFT JOIN operating_system os ON os.id = v.operating_system_id
         LEFT JOIN power_state ps ON ps.id = v.power_state_id
         LEFT JOIN vm_ip_address ip ON ip.vm_id = v.id
+        LEFT JOIN customer c ON c.id = v.customer_id
     ";
     $params = [];
 
@@ -47,7 +51,7 @@ function fetchVMs(?string $month = null): array
     }
 
     $query .= "
-        GROUP BY v.id, os.name, ps.name
+        GROUP BY v.id, os.name, ps.name, c.code, c.name
         ORDER BY v.hostname, v.exported_at DESC
     ";
 
