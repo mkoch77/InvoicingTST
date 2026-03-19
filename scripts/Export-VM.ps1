@@ -596,58 +596,73 @@ RETURNING id
         $powerStateCache = @{}
 
         $inserted = 0
+        $failed   = 0
         foreach ($row in $Data) {
-            # Resolve operating_system_id
-            $osName = $row."Operating System"
-            $osId   = $null
-            if ($osName) {
-                if ($osCache.ContainsKey($osName)) {
-                    $osId = $osCache[$osName]
-                } else {
-                    $osId = Invoke-SqlScalar -Query $upsertOsSql -Parameters @{ name = $osName }
-                    $osCache[$osName] = $osId
-                }
-            }
-
-            # Resolve power_state_id
-            $psName = $row."Power State"
-            $psId   = $null
-            if ($psName) {
-                if ($powerStateCache.ContainsKey($psName)) {
-                    $psId = $powerStateCache[$psName]
-                } else {
-                    $psId = Invoke-SqlScalar -Query $lookupPowerStateSql -Parameters @{ name = $psName }
-                    $powerStateCache[$psName] = $psId
-                }
-            }
-
-            # Insert VM
-            $vmParams = @{
-                hostname               = $row."Hostname"
-                dns_name               = $row."DNS Name"
-                operating_system_id    = $osId
-                vcpu                   = [int]($row."vCPU")
-                vram_mb                = [int]($row."vRAM (MB)")
-                used_storage_gb        = [double]($row."Used Storage (GB)")
-                provisioned_storage_gb = [double]($row."Provisioned Storage (GB)")
-                power_state_id         = $psId
-            }
-            $vmId = Invoke-SqlScalar -Query $insertVmSql -Parameters $vmParams
-
-            # Insert IP addresses (one row per address)
-            $ipString = $row."IP Address"
-            if ($ipString) {
-                foreach ($ip in ($ipString -split ',\s*')) {
-                    if ($ip) {
-                        Invoke-SqlUpdate -Query $insertIpSql -Parameters @{ vm_id = $vmId; ip_address = $ip } | Out-Null
+            try {
+                # Resolve operating_system_id
+                $osName = $row."Operating System"
+                $osId   = $null
+                if ($osName) {
+                    if ($osCache.ContainsKey($osName)) {
+                        $osId = $osCache[$osName]
+                    } else {
+                        $osId = [int](Invoke-SqlScalar -Query $upsertOsSql -Parameters @{ name = [string]$osName })
+                        $osCache[$osName] = $osId
                     }
                 }
-            }
 
-            $inserted++
+                # Resolve power_state_id
+                $psName = $row."Power State"
+                $psId   = $null
+                if ($psName) {
+                    if ($powerStateCache.ContainsKey($psName)) {
+                        $psId = $powerStateCache[$psName]
+                    } else {
+                        $psId = [int](Invoke-SqlScalar -Query $lookupPowerStateSql -Parameters @{ name = [string]$psName })
+                        $powerStateCache[$psName] = $psId
+                    }
+                }
+
+                # Insert VM — Npgsql requires explicit .NET types, $null must be [DBNull]::Value
+                $vmParams = @{
+                    hostname               = [string]($row."Hostname" ?? "")
+                    dns_name               = if ($row."DNS Name") { [string]$row."DNS Name" } else { [DBNull]::Value }
+                    operating_system_id    = if ($null -ne $osId) { [int]$osId } else { [DBNull]::Value }
+                    vcpu                   = [int]($row."vCPU" ?? 0)
+                    vram_mb                = [int]($row."vRAM (MB)" ?? 0)
+                    used_storage_gb        = [double]($row."Used Storage (GB)" ?? 0)
+                    provisioned_storage_gb = [double]($row."Provisioned Storage (GB)" ?? 0)
+                    power_state_id         = if ($null -ne $psId) { [int]$psId } else { [DBNull]::Value }
+                }
+                $vmId = [int](Invoke-SqlScalar -Query $insertVmSql -Parameters $vmParams)
+
+                # Insert IP addresses (one row per address)
+                $ipString = $row."IP Address"
+                if ($ipString) {
+                    foreach ($ip in ($ipString -split ',\s*')) {
+                        if ($ip) {
+                            Invoke-SqlUpdate -Query $insertIpSql -Parameters @{ vm_id = [int]$vmId; ip_address = [string]$ip } | Out-Null
+                        }
+                    }
+                }
+
+                $inserted++
+            }
+            catch {
+                $failed++
+                if ($failed -le 3) {
+                    Write-Log "Failed to insert VM '$($row."Hostname")': $($_.Exception.Message)" -Level WARN
+                } elseif ($failed -eq 4) {
+                    Write-Log "Further insert errors will be suppressed..." -Level WARN
+                }
+            }
         }
 
-        Write-Log "PostgreSQL: $inserted VMs inserted (normalized)." -Level INFO -ForegroundColor Green
+        if ($failed -gt 0) {
+            Write-Log "PostgreSQL: $inserted VMs inserted, $failed failed." -Level WARN
+        } else {
+            Write-Log "PostgreSQL: $inserted VMs inserted (normalized)." -Level INFO -ForegroundColor Green
+        }
     }
     finally {
         Close-SqlConnection -ErrorAction SilentlyContinue
