@@ -19,13 +19,13 @@ if (urlFilter) activeFilter = urlFilter;
 
 // ── Filter definitions matching dashboard groups ──
 const filterFns = {
-  citrix:        vm => (vm.hostname || '').toUpperCase().startsWith('CLT'),
-  server:        vm => (vm.hostname || '').toUpperCase().startsWith('F0'),
   templates:     vm => (vm.hostname || '').toUpperCase().includes('TEMP'),
+  citrix:        vm => { const h = (vm.hostname || '').toUpperCase(); return !h.includes('TEMP') && h.startsWith('CLT'); },
+  server:        vm => { const h = (vm.hostname || '').toUpperCase(); return !h.includes('TEMP') && h.startsWith('F0'); },
   off_suspended: vm => vm.power_state === 'Off' || vm.power_state === 'Suspended',
   other:         vm => {
     const h = (vm.hostname || '').toUpperCase();
-    return !h.startsWith('CLT') && !h.startsWith('F0') && !h.includes('TEMP');
+    return !h.includes('TEMP') && !h.startsWith('CLT') && !h.startsWith('F0');
   }
 };
 

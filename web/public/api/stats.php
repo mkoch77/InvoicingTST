@@ -24,12 +24,12 @@ try {
             $offSuspended++;
         }
 
-        if (str_starts_with($hostname, 'CLT')) {
+        if (str_contains($hostname, 'TEMP')) {
+            $templates++;
+        } elseif (str_starts_with($hostname, 'CLT')) {
             $citrix++;
         } elseif (str_starts_with($hostname, 'F0')) {
             $server++;
-        } elseif (str_contains($hostname, 'TEMP')) {
-            $templates++;
         }
     }
 
