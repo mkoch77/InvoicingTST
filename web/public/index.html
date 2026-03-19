@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Accounting Dashboard</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=4">
 </head>
 <body>
   <div class="navbar">
@@ -28,12 +28,16 @@
     <div class="card-group">
       <h2 class="card-group-title">Rohdaten</h2>
       <div class="card-grid">
-        <a href="/vms.html" class="card" style="text-decoration:none;color:inherit;">
+
+        <!-- VM-Kachel mit Statistiken -->
+        <div class="card card-vm">
           <div class="card-icon">&#x1F5A5;</div>
           <h2>Virtuelle Maschinen</h2>
-          <p>VM-Inventar aus VeeamOne. Hostname, IP, CPU, RAM, Storage und Power State — filterbar nach Exportmonat.</p>
-          <span class="card-link">Zur Übersicht &rarr;</span>
-        </a>
+          <div id="vm-stats" class="vm-stats">
+            <div class="vm-stats-loading">Lade Statistiken…</div>
+          </div>
+          <a href="/vms.html" class="card-link">Alle VMs anzeigen &rarr;</a>
+        </div>
 
         <div class="card" style="opacity:0.5;">
           <div class="card-icon">&#x1F4E6;</div>
@@ -41,8 +45,65 @@
           <p>Zusätzliche Abrechnungs&shy;bereiche werden hier erscheinen, sobald weitere Export-Skripte eingebunden sind.</p>
           <span class="card-link" style="color:var(--text-muted);">Demnächst verfügbar</span>
         </div>
+
       </div>
     </div>
   </div>
+
+  <script>
+    async function loadStats() {
+      const container = document.getElementById('vm-stats');
+      try {
+        const res = await fetch('/api/stats.php');
+        const s = await res.json();
+        if (s.error) throw new Error(s.error);
+
+        const month = s.month || '';
+        const link = (filter) => `/vms.html?month=${encodeURIComponent(month)}&filter=${filter}`;
+
+        container.innerHTML = `
+          <div class="vm-stats-month">${formatMonth(month)}</div>
+          <div class="vm-stats-grid">
+            <a href="${link('citrix')}" class="stat-row">
+              <span class="stat-label">Citrix Worker</span>
+              <span class="stat-value">${s.citrix}</span>
+            </a>
+            <a href="${link('server')}" class="stat-row">
+              <span class="stat-label">Server – Neue Infrastruktur</span>
+              <span class="stat-value">${s.server}</span>
+            </a>
+            <a href="${link('templates')}" class="stat-row">
+              <span class="stat-label">Templates</span>
+              <span class="stat-value">${s.templates}</span>
+            </a>
+            <a href="${link('other')}" class="stat-row">
+              <span class="stat-label">Sonstige</span>
+              <span class="stat-value">${s.other}</span>
+            </a>
+            <div class="stat-divider"></div>
+            <a href="/vms.html?month=${encodeURIComponent(month)}" class="stat-row stat-total">
+              <span class="stat-label">Gesamt</span>
+              <span class="stat-value">${s.total}</span>
+            </a>
+            <a href="${link('off_suspended')}" class="stat-row stat-muted">
+              <span class="stat-label">davon Off / Suspended</span>
+              <span class="stat-value">${s.off_suspended}</span>
+            </a>
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="vm-stats-loading">Fehler: ${err.message}</div>`;
+      }
+    }
+
+    function formatMonth(m) {
+      if (!m) return '';
+      const [y, mo] = m.split('-');
+      const d = new Date(y, parseInt(mo) - 1);
+      return d.toLocaleDateString('de-DE', { year: 'numeric', month: 'long' });
+    }
+
+    loadStats();
+  </script>
 </body>
 </html>

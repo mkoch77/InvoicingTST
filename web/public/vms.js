@@ -7,15 +7,33 @@ const pagination = document.getElementById('pagination');
 
 let allVMs = [];
 let sortKey = 'hostname';
-let sortDir = 1; // 1 = asc, -1 = desc
+let sortDir = 1;
 let currentPage = 1;
+let activeFilter = null; // group filter from URL param
+
+// ── URL parameter handling ──
+const urlParams = new URLSearchParams(window.location.search);
+const urlMonth = urlParams.get('month');
+const urlFilter = urlParams.get('filter');
+if (urlFilter) activeFilter = urlFilter;
+
+// ── Filter definitions matching dashboard groups ──
+const filterFns = {
+  citrix:        vm => (vm.hostname || '').toUpperCase().startsWith('CLT'),
+  server:        vm => (vm.hostname || '').toUpperCase().startsWith('F0'),
+  templates:     vm => (vm.hostname || '').toUpperCase().includes('TEMP'),
+  off_suspended: vm => vm.power_state === 'Off' || vm.power_state === 'Suspended',
+  other:         vm => {
+    const h = (vm.hostname || '').toUpperCase();
+    return !h.startsWith('CLT') && !h.startsWith('F0') && !h.includes('TEMP');
+  }
+};
 
 function getPageSize() {
   const val = pageSizeSelect.value;
   return val === 'all' ? Infinity : parseInt(val, 10);
 }
 
-// ── Strip CIDR suffix (e.g. /32) from IP addresses ──
 function stripCidr(ip) {
   return ip.replace(/\/\d+$/, '');
 }
@@ -33,7 +51,12 @@ async function loadMonths() {
       opt.textContent = date.toLocaleDateString('de-DE', { year: 'numeric', month: 'long' });
       monthSelect.appendChild(opt);
     });
-    if (months.length > 0) monthSelect.value = months[0];
+    // URL month param takes priority, then default to latest
+    if (urlMonth && months.includes(urlMonth)) {
+      monthSelect.value = urlMonth;
+    } else if (months.length > 0) {
+      monthSelect.value = months[0];
+    }
   } catch (err) {
     console.error('Failed to load months:', err);
   }
@@ -49,10 +72,45 @@ async function loadVMs() {
     const res = await fetch(url);
     allVMs = await res.json();
     currentPage = 1;
+    renderFilterBadge();
     renderTable();
   } catch (err) {
     vmRows.innerHTML = `<tr><td colspan="10" class="empty">Fehler: ${esc(err.message)}</td></tr>`;
   }
+}
+
+// ── Show active filter badge ──
+function renderFilterBadge() {
+  const existing = document.getElementById('filter-badge');
+  if (existing) existing.remove();
+
+  if (!activeFilter) return;
+
+  const labels = {
+    citrix: 'Citrix Worker',
+    server: 'Server - Neue Infrastruktur',
+    templates: 'Templates',
+    off_suspended: 'Ausgeschaltet / Suspended',
+    other: 'Sonstige'
+  };
+
+  const badge = document.createElement('span');
+  badge.id = 'filter-badge';
+  badge.className = 'filter-badge';
+  badge.innerHTML = `${esc(labels[activeFilter] || activeFilter)} <button class="filter-badge-remove" title="Filter entfernen">&times;</button>`;
+  badge.querySelector('button').addEventListener('click', () => {
+    activeFilter = null;
+    // Clean URL
+    const u = new URL(window.location);
+    u.searchParams.delete('filter');
+    window.history.replaceState({}, '', u);
+    renderFilterBadge();
+    currentPage = 1;
+    renderTable();
+  });
+
+  const controls = document.querySelector('.controls');
+  controls.insertBefore(badge, document.getElementById('vm-count'));
 }
 
 // ── Get filtered + sorted data ──
@@ -60,8 +118,15 @@ function getFilteredSorted() {
   const query = searchInput.value.toLowerCase().trim();
 
   let filtered = allVMs;
+
+  // Apply group filter first
+  if (activeFilter && filterFns[activeFilter]) {
+    filtered = filtered.filter(filterFns[activeFilter]);
+  }
+
+  // Then text search
   if (query) {
-    filtered = allVMs.filter(vm => {
+    filtered = filtered.filter(vm => {
       const searchable = [
         vm.hostname, vm.dns_name, vm.operating_system, vm.power_state,
         (vm.ip_addresses || []).map(stripCidr).join(', ')
@@ -104,7 +169,7 @@ function renderTable() {
 
   const fromNum = sorted.length === 0 ? 0 : start + 1;
   const toNum = start + pageData.length;
-  vmCount.textContent = `${fromNum}–${toNum} von ${sorted.length} VMs`;
+  vmCount.textContent = `${fromNum}\u2013${toNum} von ${sorted.length} VMs`;
 
   if (sorted.length === 0) {
     vmRows.innerHTML = '<tr><td colspan="10" class="empty">Keine VMs gefunden.</td></tr>';
@@ -158,7 +223,6 @@ function renderPagination(totalPages) {
   addBtn('\u00AB', 1, currentPage === 1, false);
   addBtn('\u2039', currentPage - 1, currentPage === 1, false);
 
-  // Show max 7 page numbers with ellipsis
   const maxVisible = 7;
   let pages = [];
   if (totalPages <= maxVisible) {
@@ -211,7 +275,14 @@ document.querySelectorAll('thead th[data-key]').forEach(th => {
 });
 
 // ── Events ──
-monthSelect.addEventListener('change', loadVMs);
+monthSelect.addEventListener('change', () => {
+  activeFilter = null;
+  const u = new URL(window.location);
+  u.searchParams.delete('filter');
+  window.history.replaceState({}, '', u);
+  renderFilterBadge();
+  loadVMs();
+});
 
 pageSizeSelect.addEventListener('change', () => {
   currentPage = 1;
