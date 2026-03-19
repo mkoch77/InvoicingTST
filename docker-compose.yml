@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17
+    build: ./postgres
     container_name: accounting-postgres
     restart: unless-stopped
     environment:
@@ -11,7 +11,6 @@ services:
       - "5432:5432"
     volumes:
       - accounting-pgdata:/var/lib/postgresql/data
-      - ./install-postgres-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
   web:
     build: ./web
