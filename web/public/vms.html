@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VMs – Accounting</title>
-  <link rel="stylesheet" href="/style.css?v=7">
+  <link rel="stylesheet" href="/style.css?v=8">
 </head>
 <body>
   <div class="navbar">
@@ -35,10 +35,6 @@
         <select id="month-select">
           <option value="">Alle</option>
         </select>
-        <label for="os-select">OS:</label>
-        <select id="os-select">
-          <option value="">Alle</option>
-        </select>
         <input type="text" id="search-input" placeholder="Suchen…" />
         <label for="page-size">Zeilen:</label>
         <select id="page-size">
@@ -49,50 +45,38 @@
           <option value="all">Alle</option>
         </select>
         <span id="vm-count" class="count"></span>
-        <label for="customer-select">Kunde:</label>
-        <select id="customer-select">
-          <option value="">Alle</option>
-          <option value="__none__">Nicht zugeordnet</option>
-        </select>
-        <label for="state-select">State:</label>
-        <select id="state-select">
-          <option value="">Alle</option>
-          <option value="On">On</option>
-          <option value="Off">Off</option>
-          <option value="Suspended">Suspended</option>
-        </select>
         <button id="export-btn" class="btn" title="Als Excel exportieren">&#x2B07; Excel</button>
       </div>
     </div>
+
+    <div id="active-filters" class="active-filters"></div>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th data-key="hostname">Hostname <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="dns_name">DNS <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="customer_name">Kunde <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="ip_addresses">IP <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="operating_system">OS <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="hostname" data-filterable>Hostname <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="customer_name" data-filterable data-filter-type="select">Kunde <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="ip_addresses" data-filterable>IP <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="operating_system" data-filterable data-filter-type="select">OS <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="vcpu">vCPU <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="vram_mb">RAM (MB) <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="used_storage_gb">Used (GB) <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="provisioned_storage_gb">Prov. (GB) <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="power_state">State <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="power_state" data-filterable data-filter-type="select">State <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="points">Punkte <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="pricing_class">Klasse <span class="sort-arrow">&#x25B2;</span></th>
+            <th data-key="pricing_class" data-filterable data-filter-type="select">Klasse <span class="sort-arrow">&#x25B2;</span></th>
             <th data-key="price">Preis <span class="sort-arrow">&#x25B2;</span></th>
-            <th data-key="exported_at">Timestamp <span class="sort-arrow">&#x25B2;</span></th>
           </tr>
         </thead>
         <tbody id="vm-rows">
-          <tr><td colspan="14" class="empty">Daten werden geladen…</td></tr>
+          <tr><td colspan="12" class="empty">Daten werden geladen…</td></tr>
         </tbody>
       </table>
     </div>
     <div id="pagination" class="pagination"></div>
   </div>
-  <script src="/app.js?v=7"></script>
-  <script src="/vms.js?v=7"></script>
+  <script src="/app.js?v=8"></script>
+  <script src="/vms.js?v=8"></script>
 </body>
 </html>
