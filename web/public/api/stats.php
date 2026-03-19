@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/vms.php';
+require_once __DIR__ . '/../../src/pricing.php';
 
 header('Content-Type: application/json');
 requireAuth();
@@ -18,7 +19,11 @@ try {
     $server = 0;
     $templates = 0;
 
-    foreach ($vms as $vm) {
+    // Pricing aggregation: count per class + total price
+    $classCounts = [];
+    $totalPrice = 0.0;
+
+    foreach ($vms as &$vm) {
         $hostname = strtoupper($vm['hostname'] ?? '');
         $state = $vm['power_state'] ?? '';
 
@@ -33,9 +38,30 @@ try {
         } elseif (str_starts_with($hostname, 'F0')) {
             $server++;
         }
+
+        // Enrich with pricing
+        enrichVmWithPricing($vm);
+        if (!empty($vm['pricing_class']) && $vm['price'] > 0) {
+            $cls = $vm['pricing_class'];
+            if (!isset($classCounts[$cls])) {
+                $classCounts[$cls] = ['count' => 0, 'price' => (float) $vm['price']];
+            }
+            $classCounts[$cls]['count']++;
+            $totalPrice += (float) $vm['price'];
+        }
     }
 
     $other = $total - $citrix - $server - $templates;
+
+    // Sort class counts by tier order
+    $tiers = getPricingTiers();
+    $tierOrder = [];
+    foreach ($tiers as $i => $t) {
+        $tierOrder[$t['class_name']] = $i;
+    }
+    uksort($classCounts, function ($a, $b) use ($tierOrder) {
+        return ($tierOrder[$a] ?? 999) - ($tierOrder[$b] ?? 999);
+    });
 
     echo json_encode([
         'month'         => $month,
@@ -45,6 +71,11 @@ try {
         'server'        => $server,
         'templates'     => $templates,
         'other'         => $other,
+        'billing'       => [
+            'class_counts' => $classCounts,
+            'total_price'  => round($totalPrice, 2),
+            'vm_count'     => array_sum(array_column($classCounts, 'count')),
+        ],
     ]);
 } catch (Exception $e) {
     http_response_code(500);
