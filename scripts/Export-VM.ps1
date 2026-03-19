@@ -595,13 +595,12 @@ ON CONFLICT DO NOTHING
         Open-PostGreConnection -ConnectionString $ConnectionString
         Write-Log "Connected to PostgreSQL." -Level INFO -ForegroundColor Green
 
-        # Check if data for the current month already exists
+        # Check if data for the current month already exists (info only, upsert handles re-runs)
         $currentMonth = (Get-Date).ToString('yyyy-MM')
         $checkMonthSql = "SELECT COUNT(*) FROM vm WHERE export_month = @month"
-        $existingCount = Invoke-SqlScalar -Query $checkMonthSql -Parameters @{ month = $currentMonth }
+        $existingCount = [int](Invoke-SqlScalar -Query $checkMonthSql -Parameters @{ month = [string]$currentMonth })
         if ($existingCount -gt 0) {
-            Write-Log "Export abgebrochen: Fuer Monat $currentMonth existieren bereits $existingCount VMs. Pro Monat darf nur einmal exportiert werden." -Level ERROR
-            return
+            Write-Log "Monat $currentMonth: $existingCount VMs vorhanden — Daten werden per Upsert aktualisiert." -Level INFO -ForegroundColor Yellow
         }
 
         # Cache for already-resolved lookup values
