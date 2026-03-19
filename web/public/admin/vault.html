@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vault – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=9">
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Vault</h1>
+      <p>Verschlüsselte Geheimnisse (AES-256-GCM)</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Schlüssel</th>
+            <th>Beschreibung</th>
+            <th>Erstellt</th>
+            <th>Geändert</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="vault-rows">
+          <tr><td colspan="5" class="empty">Lade Geheimnisse…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="settings-section" style="margin-top:2rem;">
+      <h2>Geheimnis anlegen / aktualisieren</h2>
+      <div class="form-group">
+        <label for="v-key">Schlüssel</label>
+        <input type="text" id="v-key" placeholder="z.B. SMTP_PASSWORD" />
+      </div>
+      <div class="form-group">
+        <label for="v-value">Wert</label>
+        <div style="position:relative;">
+          <input type="password" id="v-value" autocomplete="off" />
+          <button type="button" id="toggle-pw" class="btn-sm" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);">Anzeigen</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="v-desc">Beschreibung</label>
+        <input type="text" id="v-desc" placeholder="Optionale Beschreibung" />
+      </div>
+      <div id="vault-error" class="login-error" style="display:none;"></div>
+      <button class="btn" id="vault-save">Speichern</button>
+    </div>
+  </div>
+
+  <script src="/app.js?v=9"></script>
+  <script>
+    const dtOpts = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+
+    function esc(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function fmtDate(val) {
+      if (!val) return '-';
+      return new Date(val).toLocaleDateString('de-DE', dtOpts);
+    }
+
+    // Vordefinierte Secrets die immer angezeigt werden
+    const requiredSecrets = [
+      { key_name: 'jira_client_id',     description: 'OAuth App Client ID (developer.atlassian.com)' },
+      { key_name: 'jira_client_secret', description: 'OAuth App Client Secret' },
+      { key_name: 'jira_workspace_id',  description: 'Assets Workspace-ID (GET /rest/servicedeskapi/assets/workspace)' },
+      { key_name: 'jira_refresh_token', description: 'OAuth Refresh Token (einmalig via exchange-token.sh)' },
+    ];
+
+    async function loadVault() {
+      const tbody = document.getElementById('vault-rows');
+      const res = await fetch('/api/vault.php');
+      if (res.status === 403) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Kein Zugriff</td></tr>';
+        return;
+      }
+      const existing = await res.json();
+      const existingMap = new Map(existing.map(s => [s.key_name, s]));
+
+      // Merge: show required secrets first, then any extra ones
+      const allKeys = new Map();
+      requiredSecrets.forEach(r => allKeys.set(r.key_name, r));
+      existing.forEach(s => {
+        if (!allKeys.has(s.key_name)) allKeys.set(s.key_name, s);
+      });
+
+      tbody.innerHTML = '';
+      allKeys.forEach((def, keyName) => {
+        const saved = existingMap.get(keyName);
+        const tr = document.createElement('tr');
+
+        if (saved) {
+          tr.innerHTML = `
+            <td><strong>${esc(keyName)}</strong></td>
+            <td>${esc(saved.description || def.description || '')}</td>
+            <td>${fmtDate(saved.created_at)}</td>
+            <td>${fmtDate(saved.updated_at)}</td>
+            <td style="display:flex;gap:0.4rem;">
+              <button class="btn-sm" onclick="editSecret('${esc(keyName)}', '${esc(saved.description || def.description || '')}')">Bearbeiten</button>
+              <button class="btn-sm btn-danger" onclick="deleteSecret('${esc(keyName)}')">Löschen</button>
+            </td>
+          `;
+        } else {
+          tr.style.opacity = '0.6';
+          tr.innerHTML = `
+            <td><strong>${esc(keyName)}</strong></td>
+            <td>${esc(def.description || '')}</td>
+            <td colspan="2" style="color:var(--warning);">Nicht konfiguriert</td>
+            <td>
+              <button class="btn-sm btn-success" onclick="editSecret('${esc(keyName)}', '${esc(def.description || '')}')">Einrichten</button>
+            </td>
+          `;
+        }
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editSecret(keyName, description) {
+      document.getElementById('v-key').value = keyName;
+      document.getElementById('v-desc').value = description;
+      document.getElementById('v-value').value = '';
+      document.getElementById('v-value').focus();
+    }
+
+    async function deleteSecret(keyName) {
+      if (!confirm(`Geheimnis "${keyName}" wirklich löschen?`)) return;
+      const res = await fetch('/api/vault.php', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key_name: keyName }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Fehler beim Löschen');
+        return;
+      }
+      loadVault();
+    }
+
+    document.getElementById('vault-save').addEventListener('click', async () => {
+      const errEl = document.getElementById('vault-error');
+      errEl.style.display = 'none';
+
+      const keyName = document.getElementById('v-key').value.trim();
+      const value   = document.getElementById('v-value').value;
+      const desc    = document.getElementById('v-desc').value.trim();
+
+      if (!keyName || !value) {
+        errEl.textContent = 'Schlüssel und Wert sind Pflichtfelder.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const res = await fetch('/api/vault.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key_name: keyName, value, description: desc }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        errEl.textContent = data.error || 'Fehler beim Speichern';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      document.getElementById('v-key').value = '';
+      document.getElementById('v-value').value = '';
+      document.getElementById('v-desc').value = '';
+      loadVault();
+    });
+
+    // Toggle password visibility
+    document.getElementById('toggle-pw').addEventListener('click', () => {
+      const inp = document.getElementById('v-value');
+      const btn = document.getElementById('toggle-pw');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        btn.textContent = 'Verbergen';
+      } else {
+        inp.type = 'password';
+        btn.textContent = 'Anzeigen';
+      }
+    });
+
+    loadVault();
+  </script>
+</body>
+</html>

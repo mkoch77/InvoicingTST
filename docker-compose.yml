@@ -5,12 +5,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${PG_USER:-accounting}
-      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD muss in .env gesetzt sein}
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
       POSTGRES_DB: ${PG_DATABASE:-InvoicingAssets}
     ports:
       - "5432:5432"
     volumes:
       - accounting-pgdata:/var/lib/postgresql/data
+    secrets:
+      - pg_password
 
   web:
     build: ./web
@@ -20,8 +22,9 @@ services:
       PGHOST: accounting-postgres
       PGPORT: 5432
       PGUSER: ${PG_USER:-accounting}
-      PGPASSWORD: ${PG_PASSWORD}
+      PGPASSWORD_FILE: /run/secrets/pg_password
       PGDATABASE: ${PG_DATABASE:-InvoicingAssets}
+      VAULT_KEY: ${VAULT_KEY:?VAULT_KEY muss in .env gesetzt sein}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
       ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
@@ -30,6 +33,8 @@ services:
       - "80"
     depends_on:
       - postgres
+    secrets:
+      - pg_password
 
   nginx:
     image: nginx:alpine
@@ -55,6 +60,10 @@ services:
   #     - ./nginx/certs:/etc/letsencrypt
   #     - certbot-webroot:/var/www/certbot
   #   command: certonly --webroot -w /var/www/certbot --email admin@example.com -d example.com --agree-tos --no-eff-email
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt
 
 volumes:
   accounting-pgdata:

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CMDB Browser – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+  <div class="container">
+    <div class="page-header">
+      <h1>CMDB Browser</h1>
+      <div class="controls">
+        <div id="status-indicator" class="cmdb-status"></div>
+        <label for="schema-select">Schema:</label>
+        <select id="schema-select">
+          <option value="">Laden…</option>
+        </select>
+        <label for="type-select">Objekttyp:</label>
+        <select id="type-select">
+          <option value="">— Schema wählen —</option>
+        </select>
+        <input type="text" id="aql-input" placeholder="AQL-Query oder Freitext…" style="min-width:250px;" />
+        <button class="btn" id="search-btn">Suchen</button>
+        <span id="result-count" class="count"></span>
+      </div>
+    </div>
+
+    <div id="no-config" style="display:none;">
+      <div class="settings-section" style="max-width:600px;">
+        <h2>Jira Assets nicht konfiguriert</h2>
+        <div id="setup-step1">
+          <p style="color:var(--text-muted);margin-bottom:1rem;">
+            <strong>Schritt 1:</strong> OAuth App in der
+            <a href="https://developer.atlassian.com/console/myapps/" target="_blank">Atlassian Developer Console</a>
+            erstellen und folgende Secrets im <a href="/admin/vault.html">Vault</a> hinterlegen:
+          </p>
+          <table>
+            <thead><tr><th>Schlüssel</th><th>Beschreibung</th></tr></thead>
+            <tbody>
+              <tr><td><code>jira_client_id</code></td><td>OAuth App Client ID</td></tr>
+              <tr><td><code>jira_client_secret</code></td><td>OAuth App Client Secret</td></tr>
+              <tr><td><code>jira_workspace_id</code></td><td>Assets Workspace-ID</td></tr>
+            </tbody>
+          </table>
+          <p style="color:var(--text-muted);margin-top:1rem;font-size:0.85rem;">
+            OAuth App Scopes: <code>read:cmdb-object:jira</code>, <code>read:cmdb-icon:jira</code>, <code>offline_access</code><br>
+            Callback URL: <code id="callback-url"></code>
+          </p>
+        </div>
+        <div id="setup-step2" style="display:none;margin-top:1.5rem;">
+          <p style="color:var(--text-muted);margin-bottom:1rem;">
+            <strong>Schritt 2:</strong> Mit Atlassian verbinden, um den Zugriff zu autorisieren.
+          </p>
+          <a href="/api/jira-oauth.php?action=authorize" class="btn">Mit Jira verbinden</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="main-content">
+      <div id="active-filters" class="active-filters"></div>
+
+      <div class="table-wrap" id="results-wrap" style="display:none;">
+        <table>
+          <thead id="results-head"><tr></tr></thead>
+          <tbody id="results-body">
+            <tr><td class="empty">Bitte Schema und Objekttyp wählen oder AQL-Query eingeben.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="pagination" class="pagination"></div>
+
+      <!-- Object detail panel -->
+      <div id="detail-panel" style="display:none;">
+        <div class="settings-section" style="margin-top:1rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h2 id="detail-title">Objekt</h2>
+            <button class="btn-sm" id="detail-close">Schließen</button>
+          </div>
+          <div id="detail-attrs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=10"></script>
+  <script>
+    let currentPage = 1;
+    const perPage = 50;
+
+    async function checkStatus() {
+      // Show callback URL for setup
+      document.getElementById('callback-url').textContent =
+        window.location.origin + '/api/jira-oauth.php?action=callback';
+
+      // Check for OAuth success redirect
+      if (new URLSearchParams(window.location.search).get('oauth') === 'success') {
+        history.replaceState(null, '', '/cmdb.html');
+      }
+
+      const res = await fetch('/api/jira-assets.php?action=status');
+      const data = await res.json();
+      const indicator = document.getElementById('status-indicator');
+
+      if (data.configured) {
+        indicator.innerHTML = '<span style="color:var(--success);">&#x2713; Verbunden</span>';
+        document.getElementById('no-config').style.display = 'none';
+        loadSchemas();
+      } else if (data.oauth_ready && !data.authorized) {
+        indicator.innerHTML = '<span style="color:var(--warning);">&#x26A0; Autorisierung erforderlich</span>';
+        document.getElementById('no-config').style.display = '';
+        document.getElementById('setup-step1').style.display = 'none';
+        document.getElementById('setup-step2').style.display = '';
+        document.getElementById('results-wrap').style.display = 'none';
+      } else {
+        indicator.innerHTML = '<span style="color:var(--danger);">&#x2717; Nicht konfiguriert</span>';
+        document.getElementById('no-config').style.display = '';
+        document.getElementById('setup-step1').style.display = '';
+        document.getElementById('setup-step2').style.display = 'none';
+        document.getElementById('results-wrap').style.display = 'none';
+      }
+    }
+
+    async function loadSchemas() {
+      const sel = document.getElementById('schema-select');
+      try {
+        const res = await fetch('/api/jira-assets.php?action=schemas');
+        const data = await res.json();
+        const schemas = data.values || data.objectSchemas || data || [];
+        sel.innerHTML = '<option value="">— Schema wählen —</option>';
+        (Array.isArray(schemas) ? schemas : []).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name || s.objectSchemaKey || `Schema ${s.id}`;
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        sel.innerHTML = '<option value="">Fehler beim Laden</option>';
+      }
+    }
+
+    document.getElementById('schema-select').addEventListener('change', async function() {
+      const typeSel = document.getElementById('type-select');
+      const schemaId = this.value;
+      if (!schemaId) {
+        typeSel.innerHTML = '<option value="">— Schema wählen —</option>';
+        return;
+      }
+      typeSel.innerHTML = '<option value="">Laden…</option>';
+      try {
+        const res = await fetch(`/api/jira-assets.php?action=types&schema=${schemaId}`);
+        const types = await res.json();
+        typeSel.innerHTML = '<option value="">— Objekttyp wählen —</option>';
+        (Array.isArray(types) ? types : []).forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.name || t.id;
+          opt.textContent = `${t.name} (${t.objectCount || 0})`;
+          typeSel.appendChild(opt);
+        });
+      } catch (e) {
+        typeSel.innerHTML = '<option value="">Fehler</option>';
+      }
+    });
+
+    document.getElementById('search-btn').addEventListener('click', () => { currentPage = 1; search(); });
+    document.getElementById('aql-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { currentPage = 1; search(); }
+    });
+    document.getElementById('type-select').addEventListener('change', () => { currentPage = 1; search(); });
+
+    async function search() {
+      const aqlInput = document.getElementById('aql-input').value.trim();
+      const typeName = document.getElementById('type-select').value;
+
+      let aql = aqlInput;
+      if (!aql && typeName) {
+        aql = `objectType = "${typeName}"`;
+      } else if (!aql && !typeName) {
+        return;
+      }
+      // If type is selected and user entered text that doesn't look like AQL, make it a Name search
+      if (aqlInput && typeName && !aqlInput.includes('=') && !aqlInput.includes(' like ') && !aqlInput.includes(' LIKE ')) {
+        aql = `objectType = "${typeName}" AND Name LIKE "${aqlInput}"`;
+      }
+
+      document.getElementById('results-wrap').style.display = '';
+      document.getElementById('results-body').innerHTML = '<tr><td class="empty">Suche läuft…</td></tr>';
+      document.getElementById('results-head').querySelector('tr').innerHTML = '';
+
+      try {
+        const res = await fetch(`/api/jira-assets.php?action=search&aql=${encodeURIComponent(aql)}&page=${currentPage}&perPage=${perPage}`);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        renderResults(data);
+      } catch (e) {
+        document.getElementById('results-body').innerHTML =
+          `<tr><td class="empty" style="color:var(--danger);">Fehler: ${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function renderResults(data) {
+      const entries = data.values || data.objectEntries || [];
+      const total = data.total || data.totalFilterCount || entries.length;
+      document.getElementById('result-count').textContent = `${entries.length} von ${total} Objekten`;
+
+      if (entries.length === 0) {
+        document.getElementById('results-body').innerHTML = '<tr><td class="empty">Keine Ergebnisse</td></tr>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+
+      // Collect all attribute names across results
+      const attrNames = new Map(); // name -> order
+      entries.forEach(obj => {
+        (obj.attributes || []).forEach(a => {
+          const name = a.objectTypeAttribute?.name;
+          if (name && !attrNames.has(name)) {
+            attrNames.set(name, attrNames.size);
+          }
+        });
+      });
+
+      // Pick key columns: Key, Name, then up to 6 more attributes
+      const fixedCols = ['Key', 'Name'];
+      const extraCols = [...attrNames.keys()].filter(n => !fixedCols.includes(n)).slice(0, 6);
+      const columns = [...fixedCols, ...extraCols];
+
+      // Header
+      const thead = document.getElementById('results-head').querySelector('tr');
+      thead.innerHTML = columns.map(c => `<th>${esc(c)}</th>`).join('') + '<th></th>';
+
+      // Body
+      const tbody = document.getElementById('results-body');
+      tbody.innerHTML = '';
+      entries.forEach(obj => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', () => showDetail(obj));
+
+        columns.forEach(col => {
+          const td = document.createElement('td');
+          if (col === 'Key') {
+            td.textContent = obj.objectKey || '';
+          } else if (col === 'Name') {
+            td.textContent = obj.label || obj.name || '';
+          } else {
+            td.textContent = getAttrDisplay(obj, col);
+          }
+          tr.appendChild(td);
+        });
+
+        // Detail button
+        const tdAction = document.createElement('td');
+        tdAction.innerHTML = '<button class="btn-sm" title="Details">&#x1F50D;</button>';
+        tr.appendChild(tdAction);
+        tbody.appendChild(tr);
+      });
+
+      // Pagination
+      renderPagination(total);
+    }
+
+    function getAttrDisplay(obj, attrName) {
+      for (const a of (obj.attributes || [])) {
+        if (a.objectTypeAttribute?.name === attrName) {
+          const vals = a.objectAttributeValues || [];
+          if (vals.length === 0) return '';
+          return vals.map(v => v.displayValue || v.value || '').join(', ');
+        }
+      }
+      return '';
+    }
+
+    function renderPagination(total) {
+      const pag = document.getElementById('pagination');
+      const totalPages = Math.ceil(total / perPage);
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+      let html = '';
+      html += `<button class="page-btn" ${currentPage <= 1 ? 'disabled' : ''} data-page="${currentPage - 1}">&laquo;</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += '<span class="page-ellipsis">…</span>';
+        }
+      }
+      html += `<button class="page-btn" ${currentPage >= totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">&raquo;</button>`;
+      pag.innerHTML = html;
+
+      pag.querySelectorAll('.page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const p = parseInt(btn.dataset.page);
+          if (p && p !== currentPage) { currentPage = p; search(); }
+        });
+      });
+    }
+
+    function showDetail(obj) {
+      const panel = document.getElementById('detail-panel');
+      panel.style.display = '';
+      document.getElementById('detail-title').textContent = obj.label || obj.objectKey || 'Objekt';
+
+      const container = document.getElementById('detail-attrs');
+      let html = '<table><thead><tr><th>Attribut</th><th>Wert</th></tr></thead><tbody>';
+
+      html += `<tr><td><strong>Key</strong></td><td>${esc(obj.objectKey || '')}</td></tr>`;
+      html += `<tr><td><strong>Name</strong></td><td>${esc(obj.label || obj.name || '')}</td></tr>`;
+      html += `<tr><td><strong>Typ</strong></td><td>${esc(obj.objectType?.name || '')}</td></tr>`;
+
+      (obj.attributes || []).forEach(a => {
+        const name = a.objectTypeAttribute?.name || '';
+        const vals = (a.objectAttributeValues || []).map(v => v.displayValue || v.value || '').join(', ');
+        if (vals) {
+          html += `<tr><td><strong>${esc(name)}</strong></td><td>${esc(vals)}</td></tr>`;
+        }
+      });
+
+      if (obj.created) html += `<tr><td><strong>Erstellt</strong></td><td>${formatDate(obj.created)}</td></tr>`;
+      if (obj.updated) html += `<tr><td><strong>Geändert</strong></td><td>${formatDate(obj.updated)}</td></tr>`;
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.getElementById('detail-close').addEventListener('click', () => {
+      document.getElementById('detail-panel').style.display = 'none';
+    });
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      if (isNaN(d)) return dateStr;
+      return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function esc(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    checkStatus();
+  </script>
+</body>
+</html>

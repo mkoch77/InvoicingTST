@@ -11,7 +11,14 @@ function getDb(): PDO
     $port = getenv('PGPORT') ?: '5432';
     $db   = getenv('PGDATABASE') ?: 'InvoicingAssets';
     $user = getenv('PGUSER') ?: 'accounting';
-    $pass = getenv('PGPASSWORD') ?: 'changeme';
+
+    // Read password from Docker secret file, fall back to env var
+    $passFile = getenv('PGPASSWORD_FILE');
+    if ($passFile && is_readable($passFile)) {
+        $pass = trim(file_get_contents($passFile));
+    } else {
+        $pass = getenv('PGPASSWORD') ?: 'changeme';
+    }
 
     $dsn = "pgsql:host={$host};port={$port};dbname={$db}";
 
