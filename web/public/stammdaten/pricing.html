@@ -98,7 +98,6 @@
     }
 
     document.getElementById('save-factors-btn').addEventListener('click', async () => {
-      const msg = document.getElementById('factors-msg');
       const factors = [];
       document.querySelectorAll('#factors-container input').forEach(inp => {
         factors.push({ resource: inp.dataset.resource, points_per_unit: parseFloat(inp.value) });
@@ -109,13 +108,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ factors }),
       });
-      msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
-      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
-      setTimeout(() => msg.textContent = '', 3000);
+      showToast(res.ok ? 'Faktoren gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
     });
 
     document.getElementById('save-tiers-btn').addEventListener('click', async () => {
-      const msg = document.getElementById('tiers-msg');
       const tiers = [];
       const pointInputs = document.querySelectorAll('.tier-points');
       const priceInputs = document.querySelectorAll('.tier-price');
@@ -132,9 +128,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tiers }),
       });
-      msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
-      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
-      setTimeout(() => msg.textContent = '', 3000);
+      showToast(res.ok ? 'Preisklassen gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
     });
 
     load();

@@ -90,6 +90,9 @@ function buildSidebar() {
         <a href="/cmdb.html" class="sidebar-link ${path === '/cmdb.html' ? 'active' : ''}">
           <span class="icon">&#x1F4E6;</span><span class="label">CMDB Browser</span>
         </a>
+        <a href="/admin/logs.html" class="sidebar-link ${path === '/admin/logs.html' ? 'active' : ''}">
+          <span class="icon">&#x1F4CB;</span><span class="label">Logs</span>
+        </a>
       </div>
     </nav>
     <div class="sidebar-footer" id="sidebar-user-area"></div>
@@ -194,6 +197,42 @@ function esc(str) {
   const d = document.createElement('div');
   d.textContent = str;
   return d.innerHTML;
+}
+
+// ── Toast notifications ──
+function showToast(message, type = 'info', duration = 4000) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const icons = { success: '\u2713', error: '\u2717', warning: '\u26A0', info: '\u2139' };
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-message">${esc(message)}</span>
+    <button class="toast-close">&times;</button>
+  `;
+
+  toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
+  container.appendChild(toast);
+
+  if (duration > 0) {
+    setTimeout(() => removeToast(toast), duration);
+  }
+
+  return toast;
+}
+
+function removeToast(toast) {
+  if (!toast || toast.classList.contains('toast-out')) return;
+  toast.classList.add('toast-out');
+  toast.addEventListener('animationend', () => toast.remove());
 }
 
 // Apply dark theme immediately to prevent flash

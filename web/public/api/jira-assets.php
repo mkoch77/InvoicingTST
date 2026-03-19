@@ -63,9 +63,10 @@ try {
                 echo json_encode(['error' => 'Parameter aql erforderlich']);
                 exit;
             }
-            $page    = max(1, (int) ($_GET['page'] ?? 1));
-            $perPage = min(200, max(1, (int) ($_GET['perPage'] ?? 50)));
-            echo json_encode($client->searchObjects($aql, $page, $perPage));
+            $page      = max(1, (int) ($_GET['page'] ?? 1));
+            $perPage   = min(200, max(1, (int) ($_GET['perPage'] ?? 50)));
+            $startAt   = ($page - 1) * $perPage;
+            echo json_encode($client->searchObjects($aql, $startAt, $perPage));
             break;
 
         case 'object':

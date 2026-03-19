@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/auth.php';
+require_once __DIR__ . '/../../src/logger.php';
 
 header('Content-Type: application/json');
 
@@ -54,6 +55,7 @@ if ($method === 'PUT') {
         }
         $db->prepare("UPDATE app_user SET password_hash = :hash, updated_at = NOW() WHERE id = :id")
            ->execute(['hash' => hashPassword($input['new_password']), 'id' => $user['id']]);
+        AppLogger::info('auth', "Passwort geändert", null, $user['username'] ?? null);
     }
 
     // Return updated user

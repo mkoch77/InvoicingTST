@@ -4,8 +4,10 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/vms.php';
 require_once __DIR__ . '/../../src/pricing.php';
+require_once __DIR__ . '/../../src/logger.php';
 
-requireAuth();
+$user = requireAuth();
+AppLogger::info('export', 'Excel-Export gestartet', ['month' => $_GET['month'] ?? 'alle'], $user['username'] ?? null);
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;

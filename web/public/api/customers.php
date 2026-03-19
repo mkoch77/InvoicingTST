@@ -18,6 +18,18 @@ if ($method === 'GET') {
 $user = requireRole('admin', 'operator');
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
+if ($method === 'POST' && ($input['action'] ?? '') === 'sync_cmdb') {
+    requireRole('admin');
+    try {
+        $result = syncCustomersFromCmdb();
+        echo json_encode($result);
+    } catch (\Exception $e) {
+        http_response_code(502);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($method === 'POST') {
     if (empty($input['code']) || empty($input['name'])) {
         http_response_code(400);

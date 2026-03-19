@@ -24,7 +24,7 @@ services:
       PGUSER: ${PG_USER:-accounting}
       PGPASSWORD_FILE: /run/secrets/pg_password
       PGDATABASE: ${PG_DATABASE:-InvoicingAssets}
-      VAULT_KEY: ${VAULT_KEY:?VAULT_KEY muss in .env gesetzt sein}
+      VAULT_KEY_FILE: /run/secrets/vault_key
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
       ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
@@ -35,6 +35,7 @@ services:
       - postgres
     secrets:
       - pg_password
+      - vault_key
 
   nginx:
     image: nginx:alpine
@@ -64,6 +65,8 @@ services:
 secrets:
   pg_password:
     file: ./secrets/pg_password.txt
+  vault_key:
+    file: ./secrets/vault_key.txt
 
 volumes:
   accounting-pgdata:

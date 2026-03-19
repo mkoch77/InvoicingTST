@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/logger.php';
 
 function listCustomers(): array
 {
@@ -51,6 +52,96 @@ function updateCustomer(int $id, array $data): ?array
     $fields[] = "updated_at = NOW()";
     $db->prepare("UPDATE customer SET " . implode(', ', $fields) . " WHERE id = :id")->execute($params);
     return getCustomerById($id);
+}
+
+/**
+ * Sync customers from Jira Assets CMDB2 CustomerCode objects.
+ * Only syncs entries with Key > CMDB2-27000.
+ * Attribute order: [0]=Label, [1]=Code, [2]=Name, [3]=Status, ...
+ * Returns: ['created' => int, 'updated' => int, 'total' => int]
+ */
+function syncCustomersFromCmdb(): array
+{
+    require_once __DIR__ . '/jira_assets.php';
+
+    $client = new JiraAssetsClient();
+    $all = $client->searchAllObjects('objectType = "CustomerCode"');
+
+    $db = getDb();
+    $created = 0;
+    $updated = 0;
+    $synced_codes = [];
+
+    $seen = []; // Track codes to filter duplicates
+
+    foreach ($all as $entry) {
+        // Extract code and name from attributes by position
+        $attrs = $entry['attributes'] ?? [];
+        $code = '';
+        $name = '';
+        if (isset($attrs[1]['objectAttributeValues'][0])) {
+            $code = $attrs[1]['objectAttributeValues'][0]['displayValue']
+                 ?? $attrs[1]['objectAttributeValues'][0]['value'] ?? '';
+        }
+        if (isset($attrs[2]['objectAttributeValues'][0])) {
+            $name = $attrs[2]['objectAttributeValues'][0]['displayValue']
+                 ?? $attrs[2]['objectAttributeValues'][0]['value'] ?? '';
+        }
+
+        if (!$code) continue;
+        $code = strtoupper(trim($code));
+        $name = trim($name);
+
+        // Skip duplicates (same code already processed)
+        if (isset($seen[$code])) continue;
+        $seen[$code] = true;
+
+        $synced_codes[] = $code;
+
+        // Upsert: insert or update only if name changed, also reactivate
+        $stmt = $db->prepare("
+            INSERT INTO customer (code, name, is_active) VALUES (:code, :name, TRUE)
+            ON CONFLICT (code) DO UPDATE SET
+                name = EXCLUDED.name,
+                is_active = TRUE,
+                updated_at = NOW()
+            WHERE customer.name IS DISTINCT FROM EXCLUDED.name
+               OR customer.is_active = FALSE
+            RETURNING (xmax = 0) AS is_new
+        ");
+        $stmt->execute(['code' => $code, 'name' => $name]);
+        $row = $stmt->fetch();
+
+        if ($row === false) {
+            // No change
+        } elseif ($row['is_new']) {
+            $created++;
+        } else {
+            $updated++;
+        }
+    }
+
+    // Deactivate customers that no longer exist in CMDB
+    $deactivated = 0;
+    if (!empty($synced_codes)) {
+        $placeholders = implode(',', array_fill(0, count($synced_codes), '?'));
+        $stmt = $db->prepare("
+            UPDATE customer SET is_active = FALSE, updated_at = NOW()
+            WHERE is_active = TRUE AND code NOT IN ($placeholders)
+        ");
+        $stmt->execute($synced_codes);
+        $deactivated = $stmt->rowCount();
+    }
+
+    $result = [
+        'created' => $created,
+        'updated' => $updated,
+        'deactivated' => $deactivated,
+        'total' => $created + $updated,
+    ];
+
+    AppLogger::info('sync', "CMDB Kundenkürzel-Sync abgeschlossen", $result);
+    return $result;
 }
 
 function deleteCustomer(int $id): bool

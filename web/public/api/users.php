@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/users.php';
+require_once __DIR__ . '/../../src/logger.php';
 
 header('Content-Type: application/json');
 
@@ -42,6 +43,7 @@ if ($method === 'POST') {
     }
     try {
         $user = createUser($input);
+        AppLogger::info('user', "Benutzer erstellt: {$input['username']}", ['role' => $input['role'] ?? 'readonly'], $currentUser['username'] ?? null);
         http_response_code(201);
         echo json_encode($user);
     } catch (PDOException $e) {
@@ -69,6 +71,8 @@ if ($method === 'PUT') {
         exit;
     }
     $user = updateUser($id, $input);
+    $changes = array_keys(array_filter($input, fn($k) => $k !== 'id', ARRAY_FILTER_USE_KEY));
+    AppLogger::info('user', "Benutzer aktualisiert: {$user['username']}", ['fields' => $changes], $currentUser['username'] ?? null);
     echo json_encode($user);
     exit;
 }

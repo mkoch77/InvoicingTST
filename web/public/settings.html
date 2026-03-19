@@ -103,44 +103,40 @@
       r.addEventListener('change', async () => {
         const theme = r.value;
         applyTheme(theme);
-        const msg = document.getElementById('theme-msg');
         const res = await fetch('/api/settings.php', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ theme }),
         });
-        msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
-        msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
-        setTimeout(() => msg.textContent = '', 2000);
+        showToast(res.ok ? 'Design gespeichert' : 'Fehler', res.ok ? 'success' : 'error');
       });
     });
 
     // Save profile
     document.getElementById('save-profile-btn').addEventListener('click', async () => {
-      const msg = document.getElementById('profile-msg');
       const res = await fetch('/api/settings.php', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: document.getElementById('s-displayname').value }),
       });
-      msg.textContent = res.ok ? 'Gespeichert' : (await res.json()).error || 'Fehler';
-      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
-      setTimeout(() => msg.textContent = '', 3000);
+      if (res.ok) {
+        showToast('Profil gespeichert', 'success');
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Fehler', 'error');
+      }
     });
 
     // Change password
     document.getElementById('save-pw-btn').addEventListener('click', async () => {
-      const msg = document.getElementById('pw-msg');
       const newPw = document.getElementById('s-newpw').value;
       const newPw2 = document.getElementById('s-newpw2').value;
       if (newPw !== newPw2) {
-        msg.textContent = 'Passwörter stimmen nicht überein';
-        msg.className = 'settings-msg msg-err';
+        showToast('Passwörter stimmen nicht überein', 'error');
         return;
       }
       if (newPw.length < 8) {
-        msg.textContent = 'Mindestens 8 Zeichen';
-        msg.className = 'settings-msg msg-err';
+        showToast('Mindestens 8 Zeichen', 'error');
         return;
       }
       const res = await fetch('/api/settings.php', {
@@ -151,15 +147,15 @@
           new_password: newPw,
         }),
       });
-      const data = res.ok ? {} : await res.json();
-      msg.textContent = res.ok ? 'Passwort geändert' : data.error || 'Fehler';
-      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
       if (res.ok) {
+        showToast('Passwort geändert', 'success');
         document.getElementById('s-curpw').value = '';
         document.getElementById('s-newpw').value = '';
         document.getElementById('s-newpw2').value = '';
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Fehler', 'error');
       }
-      setTimeout(() => msg.textContent = '', 3000);
     });
 
     loadSettings();

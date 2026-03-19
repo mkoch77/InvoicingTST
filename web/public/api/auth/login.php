@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../src/auth.php';
 require_once __DIR__ . '/../../../src/session.php';
 require_once __DIR__ . '/../../../src/bruteforce.php';
 require_once __DIR__ . '/../../../src/middleware.php';
+require_once __DIR__ . '/../../../src/logger.php';
 
 header('Content-Type: application/json');
 
@@ -30,6 +31,7 @@ if (!$username || !$password) {
 // Brute force check
 if (isLockedOut($username, $ip)) {
     $remaining = getRemainingLockoutSeconds($username, $ip);
+    AppLogger::warn('auth', "Login gesperrt (Brute-Force): {$username}", ['ip' => $ip, 'retry_after' => $remaining]);
     http_response_code(429);
     echo json_encode([
         'error'   => 'Too many failed attempts. Try again later.',
@@ -42,6 +44,7 @@ $user = getUserByUsername($username);
 
 if (!$user || empty($user['password_hash']) || !verifyPassword($password, $user['password_hash'])) {
     recordAttempt($username, $ip, false);
+    AppLogger::warn('auth', "Login fehlgeschlagen: {$username}", ['ip' => $ip]);
     http_response_code(401);
     echo json_encode(['error' => 'Invalid username or password']);
     exit;
@@ -51,6 +54,7 @@ recordAttempt($username, $ip, true);
 
 $token = createSession((int) $user['id'], $ip, $_SERVER['HTTP_USER_AGENT'] ?? null);
 setSessionCookie($token);
+AppLogger::info('auth', "Login erfolgreich: {$username}", ['ip' => $ip, 'role' => $user['role']], $username);
 
 echo json_encode([
     'id'           => (int) $user['id'],

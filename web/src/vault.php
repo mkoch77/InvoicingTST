@@ -4,11 +4,19 @@ require_once __DIR__ . '/db.php';
 
 function getVaultKey(): string
 {
-    $key = getenv('VAULT_KEY');
-    if ($key === false || $key === '') {
-        throw new RuntimeException('VAULT_KEY environment variable is not set');
+    // Read from Docker secret file first, fall back to env var
+    $keyFile = getenv('VAULT_KEY_FILE');
+    if ($keyFile && is_readable($keyFile)) {
+        $key = trim(file_get_contents($keyFile));
+        if ($key !== '') return $key;
     }
-    return $key;
+
+    $key = getenv('VAULT_KEY');
+    if ($key !== false && $key !== '') {
+        return $key;
+    }
+
+    throw new RuntimeException('VAULT_KEY is not set (neither VAULT_KEY_FILE nor VAULT_KEY env var)');
 }
 
 function vaultEncrypt(string $plaintext): string

@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/pricing.php';
+require_once __DIR__ . '/../../src/logger.php';
 
 header('Content-Type: application/json');
 
@@ -22,12 +23,15 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $db = getDb();
 
 if ($method === 'PUT') {
+    $username = AppLogger::currentUser();
+
     // Update factors
     if (!empty($input['factors'])) {
         $stmt = $db->prepare("UPDATE pricing_factor SET points_per_unit = :pts, updated_at = NOW() WHERE resource = :res");
         foreach ($input['factors'] as $f) {
             $stmt->execute(['pts' => (float) $f['points_per_unit'], 'res' => $f['resource']]);
         }
+        AppLogger::info('user', 'Punktefaktoren aktualisiert', ['factors' => $input['factors']], $username);
     }
 
     // Update tier prices
@@ -36,6 +40,7 @@ if ($method === 'PUT') {
         foreach ($input['tiers'] as $t) {
             $stmt->execute(['price' => (float) $t['price'], 'pts' => (float) $t['max_points'], 'id' => (int) $t['id']]);
         }
+        AppLogger::info('user', 'Preisklassen aktualisiert', ['count' => count($input['tiers'])], $username);
     }
 
     echo json_encode(['ok' => true]);

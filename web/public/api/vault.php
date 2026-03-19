@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/vault.php';
+require_once __DIR__ . '/../../src/logger.php';
 
 header('Content-Type: application/json');
 
@@ -23,6 +24,7 @@ if ($method === 'POST') {
     }
 
     setVaultSecret($input['key_name'], $input['value'], $input['description'] ?? '');
+    AppLogger::info('vault', "Secret gespeichert: {$input['key_name']}", null, $user['username'] ?? null);
     echo json_encode(['ok' => true]);
     exit;
 }
@@ -37,6 +39,7 @@ if ($method === 'DELETE') {
     }
 
     if (deleteVaultSecret($input['key_name'])) {
+        AppLogger::warn('vault', "Secret gelöscht: {$input['key_name']}", null, $user['username'] ?? null);
         echo json_encode(['ok' => true]);
     } else {
         http_response_code(404);

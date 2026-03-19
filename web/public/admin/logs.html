@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Logs</h1>
+    </div>
+
+    <div class="controls">
+      <select id="filter-level">
+        <option value="">Alle Level</option>
+        <option value="DEBUG">DEBUG</option>
+        <option value="INFO">INFO</option>
+        <option value="WARN">WARN</option>
+        <option value="ERROR">ERROR</option>
+      </select>
+      <select id="filter-category">
+        <option value="">Alle Kategorien</option>
+      </select>
+      <input type="text" id="filter-search" placeholder="Suche…" />
+      <label style="display:flex;align-items:center;gap:.4rem;white-space:nowrap;">
+        <input type="checkbox" id="auto-refresh" /> Auto-Refresh
+      </label>
+      <span id="entry-count" style="white-space:nowrap;">0 Eintr&auml;ge</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Zeitpunkt</th>
+            <th>Level</th>
+            <th>Kategorie</th>
+            <th>Benutzer</th>
+            <th>Nachricht</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="log-rows">
+          <tr><td colspan="6" class="empty">Lade Logs…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="pagination" class="controls" style="justify-content:center;gap:.5rem;margin-top:1rem;"></div>
+  </div>
+
+  <script src="/app.js?v=10"></script>
+  <script>
+    let currentPage = 1;
+    const perPage = 100;
+    let refreshTimer = null;
+
+    const levelEl    = document.getElementById('filter-level');
+    const categoryEl = document.getElementById('filter-category');
+    const searchEl   = document.getElementById('filter-search');
+    const autoEl     = document.getElementById('auto-refresh');
+    const countEl    = document.getElementById('entry-count');
+    const tbody      = document.getElementById('log-rows');
+    const pagDiv     = document.getElementById('pagination');
+
+    function esc(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function formatTs(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('de-DE', {
+        day:   '2-digit',
+        month: '2-digit',
+        year:  'numeric',
+      }) + ' ' + d.toLocaleTimeString('de-DE', {
+        hour:   '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    }
+
+    function levelClass(lvl) {
+      switch (lvl) {
+        case 'DEBUG': return 'text-muted';
+        case 'WARN':  return 'text-warning';
+        case 'ERROR': return 'text-danger';
+        default:      return '';
+      }
+    }
+
+    function renderDetails(ctx) {
+      if (!ctx) return '<span class="text-muted">–</span>';
+      const json = typeof ctx === 'string' ? ctx : JSON.stringify(ctx, null, 2);
+      if (json.length <= 50) return '<code>' + esc(json) + '</code>';
+      const short = json.substring(0, 50) + '…';
+      return '<code class="log-detail" title="Klicken zum Aufklappen" style="cursor:pointer" data-full="' + esc(json) + '" data-collapsed="true">' + esc(short) + '</code>';
+    }
+
+    async function loadLogs() {
+      const params = new URLSearchParams();
+      if (levelEl.value)    params.set('level', levelEl.value);
+      if (categoryEl.value) params.set('category', categoryEl.value);
+      if (searchEl.value)   params.set('search', searchEl.value);
+      params.set('page', currentPage);
+      params.set('perPage', perPage);
+
+      const res = await fetch('/api/logs.php?' + params.toString());
+      if (res.status === 403) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">Kein Zugriff</td></tr>';
+        return;
+      }
+      const data = await res.json();
+
+      countEl.textContent = data.total + ' Eintr\u00e4ge';
+
+      // Populate category dropdown (keep current selection)
+      const curCat = categoryEl.value;
+      categoryEl.innerHTML = '<option value="">Alle Kategorien</option>';
+      (data.categories || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        if (c === curCat) opt.selected = true;
+        categoryEl.appendChild(opt);
+      });
+
+      renderTable(data.logs);
+      renderPagination(data.total);
+    }
+
+    function renderTable(logs) {
+      if (!logs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">Keine Eintr\u00e4ge</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      logs.forEach(l => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + formatTs(l.created_at) + '</td>' +
+          '<td class="' + levelClass(l.level) + '"><strong>' + esc(l.level) + '</strong></td>' +
+          '<td>' + esc(l.category) + '</td>' +
+          '<td>' + esc(l.username || '–') + '</td>' +
+          '<td>' + esc(l.message) + '</td>' +
+          '<td>' + renderDetails(l.context) + '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderPagination(total) {
+      const pages = Math.max(1, Math.ceil(total / perPage));
+      pagDiv.innerHTML = '';
+      if (pages <= 1) return;
+
+      for (let p = 1; p <= pages; p++) {
+        const btn = document.createElement('button');
+        btn.className = 'page-btn' + (p === currentPage ? ' active' : '');
+        btn.textContent = p;
+        btn.addEventListener('click', () => { currentPage = p; loadLogs(); });
+        pagDiv.appendChild(btn);
+      }
+    }
+
+    // Expand/collapse details on click
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('.log-detail');
+      if (!el) return;
+      if (el.dataset.collapsed === 'true') {
+        el.textContent = el.dataset.full;
+        el.style.whiteSpace = 'pre-wrap';
+        el.style.wordBreak = 'break-all';
+        el.dataset.collapsed = 'false';
+      } else {
+        el.textContent = el.dataset.full.substring(0, 50) + '\u2026';
+        el.style.whiteSpace = '';
+        el.style.wordBreak = '';
+        el.dataset.collapsed = 'true';
+      }
+    });
+
+    // Filters
+    levelEl.addEventListener('change', () => { currentPage = 1; loadLogs(); });
+    categoryEl.addEventListener('change', () => { currentPage = 1; loadLogs(); });
+
+    let searchTimeout = null;
+    searchEl.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => { currentPage = 1; loadLogs(); }, 400);
+    });
+
+    // Auto-refresh
+    autoEl.addEventListener('change', () => {
+      if (autoEl.checked) {
+        refreshTimer = setInterval(loadLogs, 10000);
+      } else {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    });
+
+    loadLogs();
+  </script>
+</body>
+</html>

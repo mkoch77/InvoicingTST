@@ -12,6 +12,7 @@
  */
 
 require_once __DIR__ . '/vault.php';
+require_once __DIR__ . '/logger.php';
 
 class JiraAssetsClient
 {
@@ -74,11 +75,13 @@ class JiraAssetsClient
         ], false);
 
         if (empty($response['access_token'])) {
-            // Refresh token may be expired — user needs to re-authorize
+            AppLogger::error('cmdb', 'Jira OAuth Token-Refresh fehlgeschlagen — erneute Autorisierung nötig');
             throw new \RuntimeException(
                 'Jira OAuth Token abgelaufen. Bitte erneut autorisieren über CMDB > Verbinden.'
             );
         }
+
+        AppLogger::debug('cmdb', 'Jira OAuth Token erfolgreich erneuert');
 
         // Save new tokens in vault
         setVaultSecret('jira_access_token', $response['access_token'], 'OAuth Access Token (auto)');
@@ -222,12 +225,11 @@ class JiraAssetsClient
 
     // ── Public API methods ──
 
-    public function searchObjects(string $aql, int $page = 1, int $perPage = 50, bool $includeAttributes = true): array
+    public function searchObjects(string $aql, int $startAt = 0, int $maxResults = 50, bool $includeAttributes = true): array
     {
-        return $this->request('POST', $this->assetsUrl('/object/aql'), [
+        $params = http_build_query(['startAt' => $startAt, 'maxResults' => $maxResults]);
+        return $this->request('POST', $this->assetsUrl('/object/aql') . '?' . $params, [
             'qlQuery'                => $aql,
-            'page'                   => $page,
-            'resultPerPage'          => $perPage,
             'includeAttributes'      => $includeAttributes,
             'includeAttributesDeep'  => 1,
         ]);
@@ -235,15 +237,16 @@ class JiraAssetsClient
 
     public function searchAllObjects(string $aql, bool $includeAttributes = true): array
     {
-        $all  = [];
-        $page = 1;
+        $all     = [];
+        $startAt = 0;
+        $perPage = 100;
         do {
-            $result  = $this->searchObjects($aql, $page, 100, $includeAttributes);
+            $result  = $this->searchObjects($aql, $startAt, $perPage, $includeAttributes);
             $entries = $result['values'] ?? $result['objectEntries'] ?? [];
             $all     = array_merge($all, $entries);
-            $total   = $result['total'] ?? $result['totalFilterCount'] ?? count($entries);
-            $page++;
-        } while (count($all) < $total);
+            $startAt += count($entries);
+            $isLast  = ($result['isLast'] ?? $result['last'] ?? true) || empty($entries);
+        } while (!$isLast);
         return $all;
     }
 
