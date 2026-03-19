@@ -1,4 +1,5 @@
 const monthSelect = document.getElementById('month-select');
+const osSelect = document.getElementById('os-select');
 const searchInput = document.getElementById('search-input');
 const pageSizeSelect = document.getElementById('page-size');
 const vmRows = document.getElementById('vm-rows');
@@ -62,6 +63,27 @@ async function loadMonths() {
   }
 }
 
+// ── Populate OS filter dropdown ──
+function populateOsFilter() {
+  const prev = osSelect.value;
+  const osSet = new Set();
+  allVMs.forEach(vm => {
+    if (vm.operating_system) osSet.add(vm.operating_system);
+  });
+  const sorted = [...osSet].sort((a, b) => a.localeCompare(b, 'de'));
+
+  // Keep "Alle" option, rebuild rest
+  osSelect.length = 1;
+  sorted.forEach(os => {
+    const opt = document.createElement('option');
+    opt.value = os;
+    opt.textContent = os;
+    osSelect.appendChild(opt);
+  });
+  // Restore previous selection if still valid
+  if (prev && sorted.includes(prev)) osSelect.value = prev;
+}
+
 // ── Fetch VM data ──
 async function loadVMs() {
   const month = monthSelect.value;
@@ -72,6 +94,7 @@ async function loadVMs() {
     const res = await fetch(url);
     allVMs = await res.json();
     currentPage = 1;
+    populateOsFilter();
     renderFilterBadge();
     renderTable();
   } catch (err) {
@@ -119,9 +142,15 @@ function getFilteredSorted() {
 
   let filtered = allVMs;
 
-  // Apply group filter first
+  // Apply group filter
   if (activeFilter && filterFns[activeFilter]) {
     filtered = filtered.filter(filterFns[activeFilter]);
+  }
+
+  // Apply OS filter
+  const selectedOs = osSelect.value;
+  if (selectedOs) {
+    filtered = filtered.filter(vm => vm.operating_system === selectedOs);
   }
 
   // Then text search
@@ -285,6 +314,11 @@ monthSelect.addEventListener('change', () => {
 });
 
 pageSizeSelect.addEventListener('change', () => {
+  currentPage = 1;
+  renderTable();
+});
+
+osSelect.addEventListener('change', () => {
   currentPage = 1;
   renderTable();
 });
