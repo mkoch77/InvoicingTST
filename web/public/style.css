@@ -282,6 +282,7 @@ tbody tr:hover { background: var(--row-hover); }
 td.ip-cell { white-space: normal; max-width: 160px; }
 td.os-cell { white-space: normal; max-width: 180px; }
 td.customer-cell { white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .customer-assign {
   padding: 0.2rem 0.4rem;

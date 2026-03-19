@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preisklassen – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=7">
+</head>
+<body>
+  <div class="navbar">
+    <span class="brand">Accounting</span>
+    <nav>
+      <a href="/">Dashboard</a>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle">Rohdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/vms.html">VMs</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle active">Stammdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/stammdaten/customers.html">Kundenkürzel</a>
+          <a href="/stammdaten/pricing.html" class="active">Preisklassen</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-header"><h1>Preisklassen &amp; Punktefaktoren</h1></div>
+
+    <div class="settings-grid">
+      <!-- Factors -->
+      <div class="settings-section">
+        <h2>Punktefaktoren</h2>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+          Punkte pro Einheit. Gesamtpunkte = (vCPU &times; Faktor) + (RAM GB &times; Faktor) + (Storage GB &times; Faktor)
+        </p>
+        <div id="factors-container"></div>
+        <button class="btn" id="save-factors-btn" style="margin-top:1rem;">Faktoren speichern</button>
+        <span id="factors-msg" class="settings-msg"></span>
+      </div>
+
+      <!-- Tiers -->
+      <div class="settings-section" style="grid-column: span 2;">
+        <h2>Preisklassen</h2>
+        <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Klasse</th>
+                <th>Bis Punkte</th>
+                <th>Preis (EUR)</th>
+              </tr>
+            </thead>
+            <tbody id="tiers-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=7"></script>
+  <script>
+    let pricingData = null;
+
+    async function load() {
+      const res = await fetch('/api/pricing.php');
+      pricingData = await res.json();
+      renderFactors();
+      renderTiers();
+    }
+
+    function renderFactors() {
+      const labels = { vcpu: 'vCPU', vram_gb: 'RAM (GB)', storage_gb: 'Storage (GB)' };
+      const c = document.getElementById('factors-container');
+      c.innerHTML = '';
+      pricingData.factors.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        div.innerHTML = `
+          <label>${labels[f.resource] || f.resource} (pro ${f.unit})</label>
+          <input type="number" step="0.0001" data-resource="${f.resource}" value="${f.points_per_unit}" />
+        `;
+        c.appendChild(div);
+      });
+    }
+
+    function renderTiers() {
+      const tbody = document.getElementById('tiers-rows');
+      tbody.innerHTML = '';
+      pricingData.tiers.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${t.class_name}</strong></td>
+          <td>${Number(t.max_points).toLocaleString('de-DE')}</td>
+          <td>${Number(t.price).toLocaleString('de-DE', {minimumFractionDigits:2})} \u20AC</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('save-factors-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('factors-msg');
+      const factors = [];
+      document.querySelectorAll('#factors-container input').forEach(inp => {
+        factors.push({ resource: inp.dataset.resource, points_per_unit: parseFloat(inp.value) });
+      });
+
+      const res = await fetch('/api/pricing.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factors }),
+      });
+      msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
+      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
+      setTimeout(() => msg.textContent = '', 3000);
+    });
+
+    load();
+  </script>
+</body>
+</html>

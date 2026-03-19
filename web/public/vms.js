@@ -1,6 +1,7 @@
 const monthSelect = document.getElementById('month-select');
 const osSelect = document.getElementById('os-select');
 const customerSelect = document.getElementById('customer-select');
+const stateSelect = document.getElementById('state-select');
 const searchInput = document.getElementById('search-input');
 const pageSizeSelect = document.getElementById('page-size');
 const vmRows = document.getElementById('vm-rows');
@@ -103,7 +104,7 @@ function populateOsFilter() {
 async function loadVMs() {
   const month = monthSelect.value;
   const url = month ? `/api/vms.php?month=${month}` : '/api/vms.php';
-  vmRows.innerHTML = '<tr><td colspan="11" class="empty">Laden…</td></tr>';
+  vmRows.innerHTML = '<tr><td colspan="14" class="empty">Laden…</td></tr>';
 
   try {
     const res = await fetch(url);
@@ -127,7 +128,7 @@ async function loadVMs() {
     renderFilterBadge();
     renderTable();
   } catch (err) {
-    vmRows.innerHTML = `<tr><td colspan="11" class="empty">Fehler: ${esc(err.message)}</td></tr>`;
+    vmRows.innerHTML = `<tr><td colspan="14" class="empty">Fehler: ${esc(err.message)}</td></tr>`;
   }
 }
 
@@ -179,6 +180,11 @@ function getFilteredSorted() {
     filtered = filtered.filter(vm => !vm.customer_id);
   } else if (selectedCustomer) {
     filtered = filtered.filter(vm => String(vm.customer_id) === selectedCustomer);
+  }
+
+  const selectedState = stateSelect.value;
+  if (selectedState) {
+    filtered = filtered.filter(vm => vm.power_state === selectedState);
   }
 
   if (query) {
@@ -244,7 +250,7 @@ function renderTable() {
   vmCount.textContent = `${fromNum}\u2013${toNum} von ${sorted.length} VMs`;
 
   if (sorted.length === 0) {
-    vmRows.innerHTML = '<tr><td colspan="11" class="empty">Keine VMs gefunden.</td></tr>';
+    vmRows.innerHTML = '<tr><td colspan="14" class="empty">Keine VMs gefunden.</td></tr>';
     pagination.innerHTML = '';
     return;
   }
@@ -278,6 +284,9 @@ function renderTable() {
       <td>${vm.used_storage_gb ?? ''}</td>
       <td>${vm.provisioned_storage_gb ?? ''}</td>
       <td class="${stateClass}">${esc(vm.power_state || '')}</td>
+      <td class="num">${vm.points != null ? formatNum(vm.points) : ''}</td>
+      <td>${esc(vm.pricing_class || '')}</td>
+      <td class="num">${vm.price != null ? formatCurrency(vm.price) : ''}</td>
       <td>${esc(formatDate(vm.exported_at))}</td>
     `;
     vmRows.appendChild(tr);
@@ -390,6 +399,7 @@ monthSelect.addEventListener('change', () => {
 pageSizeSelect.addEventListener('change', () => { currentPage = 1; renderTable(); });
 osSelect.addEventListener('change', () => { currentPage = 1; renderTable(); });
 customerSelect.addEventListener('change', () => { currentPage = 1; renderTable(); });
+stateSelect.addEventListener('change', () => { currentPage = 1; renderTable(); });
 
 let searchTimeout;
 searchInput.addEventListener('input', () => {
@@ -397,34 +407,21 @@ searchInput.addEventListener('input', () => {
   searchTimeout = setTimeout(() => { currentPage = 1; renderTable(); }, 150);
 });
 
-// ── Auto-assign button ──
-document.getElementById('assign-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('assign-btn');
-  const month = monthSelect.value;
-  btn.disabled = true;
-  btn.textContent = 'Läuft…';
-  try {
-    const res = await fetch('/api/vm-customer.php', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ month }),
-    });
-    const data = await res.json();
-    btn.textContent = `${data.updated} aktualisiert`;
-    await loadVMs();
-    setTimeout(() => { btn.textContent = 'Zuordnung'; }, 2000);
-  } catch (e) {
-    btn.textContent = 'Fehler';
-    setTimeout(() => { btn.textContent = 'Zuordnung'; }, 2000);
-  }
-  btn.disabled = false;
-});
-
 // ── Excel export ──
 document.getElementById('export-btn').addEventListener('click', () => {
   const month = monthSelect.value;
   window.location.href = month ? `/api/export.php?month=${month}` : '/api/export.php';
 });
+
+function formatNum(val) {
+  if (val == null) return '';
+  return Number(val).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatCurrency(val) {
+  if (val == null) return '';
+  return Number(val).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC';
+}
 
 function formatDate(val) {
   if (!val) return '';
