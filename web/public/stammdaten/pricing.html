@@ -45,7 +45,7 @@
       <!-- Tiers -->
       <div class="settings-section" style="grid-column: span 2;">
         <h2>Preisklassen</h2>
-        <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+        <div class="table-wrap" style="max-height:600px;overflow-y:auto;">
           <table>
             <thead>
               <tr>
@@ -56,6 +56,10 @@
             </thead>
             <tbody id="tiers-rows"></tbody>
           </table>
+        </div>
+        <div style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem;">
+          <button class="btn" id="save-tiers-btn">Preisklassen speichern</button>
+          <span id="tiers-msg" class="settings-msg"></span>
         </div>
       </div>
     </div>
@@ -88,17 +92,28 @@
     }
 
     function renderTiers() {
+      const isAdmin = currentUser && currentUser.role === 'admin';
       const tbody = document.getElementById('tiers-rows');
       tbody.innerHTML = '';
       pricingData.tiers.forEach(t => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><strong>${t.class_name}</strong></td>
-          <td>${Number(t.max_points).toLocaleString('de-DE')}</td>
-          <td>${Number(t.price).toLocaleString('de-DE', {minimumFractionDigits:2})} \u20AC</td>
-        `;
+        if (isAdmin) {
+          tr.innerHTML = `
+            <td><strong>${t.class_name}</strong></td>
+            <td><input type="number" class="tier-points" data-id="${t.id}" value="${t.max_points}" step="1" style="width:80px;" /></td>
+            <td><input type="number" class="tier-price" data-id="${t.id}" value="${t.price}" step="0.01" style="width:110px;" /></td>
+          `;
+        } else {
+          tr.innerHTML = `
+            <td><strong>${t.class_name}</strong></td>
+            <td>${Number(t.max_points).toLocaleString('de-DE')}</td>
+            <td>${Number(t.price).toLocaleString('de-DE', {minimumFractionDigits:2})} \u20AC</td>
+          `;
+        }
         tbody.appendChild(tr);
       });
+
+      document.getElementById('save-tiers-btn').style.display = isAdmin ? '' : 'none';
     }
 
     document.getElementById('save-factors-btn').addEventListener('click', async () => {
@@ -112,6 +127,29 @@
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ factors }),
+      });
+      msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
+      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
+      setTimeout(() => msg.textContent = '', 3000);
+    });
+
+    document.getElementById('save-tiers-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('tiers-msg');
+      const tiers = [];
+      const pointInputs = document.querySelectorAll('.tier-points');
+      const priceInputs = document.querySelectorAll('.tier-price');
+      pointInputs.forEach((inp, i) => {
+        tiers.push({
+          id: parseInt(inp.dataset.id),
+          max_points: parseFloat(inp.value),
+          price: parseFloat(priceInputs[i].value),
+        });
+      });
+
+      const res = await fetch('/api/pricing.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tiers }),
       });
       msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
       msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');

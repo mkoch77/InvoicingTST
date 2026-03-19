@@ -37,14 +37,14 @@ function getPricingTiers(): array
 /**
  * Calculate points for a VM
  */
-function calculatePoints(int $vcpu, int $vramMb, float $usedStorageGb): float
+function calculatePoints(int $vcpu, int $vramMb, float $provisionedStorageGb): float
 {
     $f = getPricingFactors();
     $vramGb = $vramMb / 1024.0;
 
     return ($vcpu * ($f['vcpu'] ?? 17.5185))
          + ($vramGb * ($f['vram_gb'] ?? 7.2807))
-         + ($usedStorageGb * ($f['storage_gb'] ?? 0.1668));
+         + ($provisionedStorageGb * ($f['storage_gb'] ?? 0.1668));
 }
 
 /**
@@ -73,9 +73,9 @@ function enrichVmWithPricing(array &$vm): void
 {
     $vcpu = (int) ($vm['vcpu'] ?? 0);
     $vramMb = (int) ($vm['vram_mb'] ?? 0);
-    $storageGb = (float) ($vm['used_storage_gb'] ?? 0);
+    $provStorageGb = (float) ($vm['provisioned_storage_gb'] ?? 0);
 
-    $points = calculatePoints($vcpu, $vramMb, $storageGb);
+    $points = calculatePoints($vcpu, $vramMb, $provStorageGb);
     $tier = findTier($points);
 
     $vm['points'] = round($points, 2);

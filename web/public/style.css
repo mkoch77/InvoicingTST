@@ -284,6 +284,23 @@ td.os-cell { white-space: normal; max-width: 180px; }
 td.customer-cell { white-space: nowrap; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
+td input[type="number"] {
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  text-align: right;
+}
+
+td input[type="number"]:focus {
+  border-color: var(--accent);
+}
+
 .customer-assign {
   padding: 0.2rem 0.4rem;
   border: 1px solid var(--border);
