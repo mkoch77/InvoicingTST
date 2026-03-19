@@ -108,6 +108,20 @@ async function loadVMs() {
   try {
     const res = await fetch(url);
     allVMs = await res.json();
+
+    // Auto-assign customers if any VMs are unassigned
+    const hasUnassigned = allVMs.some(vm => !vm.customer_id);
+    if (hasUnassigned && month) {
+      await fetch('/api/vm-customer.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      });
+      // Reload to get updated assignments
+      const res2 = await fetch(url);
+      allVMs = await res2.json();
+    }
+
     currentPage = 1;
     populateOsFilter();
     renderFilterBadge();
@@ -193,9 +207,19 @@ function getFilteredSorted() {
   return sorted;
 }
 
-// ── Build customer select HTML for inline assignment ──
+// ── Check if hostname has an auto-detectable customer code ──
+function hasAutoCode(hostname) {
+  const h = (hostname || '').toUpperCase();
+  if (/^F[023]/.test(h) && h.length >= 5) {
+    const code = h.substring(2, 5);
+    return allCustomers.some(c => c.code.toUpperCase() === code);
+  }
+  return false;
+}
+
+// ── Build customer select HTML for manual assignment (only for VMs without auto-code) ──
 function customerSelectHtml(vmHostname, currentCustomerId) {
-  let html = `<select class="customer-assign" data-hostname="${esc(vmHostname)}" title="Kunde zuordnen">`;
+  let html = `<select class="customer-assign" data-hostname="${esc(vmHostname)}" title="Kunde manuell zuordnen">`;
   html += '<option value="">– Kein Kunde –</option>';
   allCustomers.forEach(c => {
     const sel = (currentCustomerId && String(c.id) === String(currentCustomerId)) ? ' selected' : '';
@@ -236,14 +260,17 @@ function renderTable() {
       vm.power_state === 'Off' ? 'state-off' :
       vm.power_state === 'Suspended' ? 'state-suspended' : '';
 
-    const customerCell = canAssign
-      ? customerSelectHtml(vm.hostname, vm.customer_id)
-      : esc(vm.customer_name ? `${vm.customer_code} – ${vm.customer_name}` : '');
+    let customerCell;
+    if (canAssign) {
+      customerCell = customerSelectHtml(vm.hostname, vm.customer_id);
+    } else {
+      customerCell = vm.customer_name ? esc(`${vm.customer_code} – ${vm.customer_name}`) : '';
+    }
 
     tr.innerHTML = `
-      <td class="customer-cell">${customerCell}</td>
       <td>${esc(vm.hostname)}</td>
       <td>${esc(vm.dns_name || '')}</td>
+      <td class="customer-cell">${customerCell}</td>
       <td class="ip-cell">${esc(ips)}</td>
       <td class="os-cell">${esc(vm.operating_system || '')}</td>
       <td>${vm.vcpu ?? ''}</td>

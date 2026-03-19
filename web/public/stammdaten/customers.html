@@ -102,13 +102,16 @@
       tbody.innerHTML = '';
       filtered.forEach(c => {
         const tr = document.createElement('tr');
+        if (!c.is_active) tr.style.opacity = '0.5';
         tr.innerHTML = `
           <td><strong>${esc(c.code)}</strong></td>
           <td>${esc(c.name)}</td>
           <td>${c.is_active ? '<span class="state-on">Aktiv</span>' : '<span class="state-off">Inaktiv</span>'}</td>
           <td>
             <button class="btn-sm" onclick="edit(${c.id})">Bearbeiten</button>
-            <button class="btn-sm btn-danger" onclick="del(${c.id}, '${esc(c.code)}')">Löschen</button>
+            <button class="btn-sm ${c.is_active ? 'btn-danger' : 'btn-success'}" onclick="toggleActive(${c.id}, ${!c.is_active})">
+              ${c.is_active ? 'Deaktivieren' : 'Aktivieren'}
+            </button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -136,9 +139,12 @@
       if (c) openModal('Kürzel bearbeiten', c);
     }
 
-    async function del(id, code) {
-      if (!confirm(`Kürzel "${code}" wirklich löschen?`)) return;
-      await fetch('/api/customers.php?id=' + id, { method: 'DELETE' });
+    async function toggleActive(id, active) {
+      await fetch('/api/customers.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: active }),
+      });
       load();
     }
 

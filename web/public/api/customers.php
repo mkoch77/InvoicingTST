@@ -47,13 +47,7 @@ if ($method === 'PUT') {
     exit;
 }
 
-if ($method === 'DELETE') {
-    $id = (int) ($input['id'] ?? $_GET['id'] ?? 0);
-    if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
-    deleteCustomer($id);
-    echo json_encode(['ok' => true]);
-    exit;
-}
+// DELETE not allowed — use PUT with is_active=false to deactivate
 
 http_response_code(405);
 echo json_encode(['error' => 'Method not allowed']);
