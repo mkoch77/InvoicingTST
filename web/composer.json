@@ -1,5 +1,6 @@
 {
     "require": {
-        "phpoffice/phpspreadsheet": "^2.0"
+        "phpoffice/phpspreadsheet": "^2.0",
+        "thenetworg/oauth2-azure": "^2.2"
     }
 }

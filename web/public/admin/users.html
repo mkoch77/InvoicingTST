@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benutzerverwaltung – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=5">
+</head>
+<body>
+  <div class="navbar">
+    <span class="brand">Accounting</span>
+    <nav>
+      <a href="/">Dashboard</a>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle">Rohdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/vms.html">VMs</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Benutzerverwaltung</h1>
+      <div class="controls">
+        <button class="btn" id="add-user-btn">+ Benutzer anlegen</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Benutzername</th>
+            <th>Anzeigename</th>
+            <th>E-Mail</th>
+            <th>Rolle</th>
+            <th>Auth</th>
+            <th>Aktiv</th>
+            <th>Erstellt</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="user-rows">
+          <tr><td colspan="8" class="empty">Lade Benutzer…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal -->
+    <div id="user-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <h2 id="modal-title">Benutzer anlegen</h2>
+        <div class="form-group">
+          <label for="m-username">Benutzername *</label>
+          <input type="text" id="m-username" />
+        </div>
+        <div class="form-group">
+          <label for="m-displayname">Anzeigename</label>
+          <input type="text" id="m-displayname" />
+        </div>
+        <div class="form-group">
+          <label for="m-email">E-Mail</label>
+          <input type="email" id="m-email" />
+        </div>
+        <div class="form-group">
+          <label for="m-role">Rolle</label>
+          <select id="m-role">
+            <option value="readonly">Nur Lesen</option>
+            <option value="operator">Operator</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="m-password">Passwort (min. 8 Zeichen)</label>
+          <input type="password" id="m-password" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label for="m-entra">Entra ID (Object ID, optional)</label>
+          <input type="text" id="m-entra" />
+        </div>
+        <div id="modal-error" class="login-error" style="display:none;"></div>
+        <div class="modal-actions">
+          <button class="btn" id="modal-save">Speichern</button>
+          <button class="btn btn-secondary" id="modal-cancel">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=5"></script>
+  <script>
+    let users = [];
+    let editId = null;
+
+    const roleLabels = { admin: 'Administrator', operator: 'Operator', readonly: 'Nur Lesen' };
+
+    async function loadUsers() {
+      const res = await fetch('/api/users.php');
+      if (res.status === 403) {
+        document.getElementById('user-rows').innerHTML = '<tr><td colspan="8" class="empty">Kein Zugriff</td></tr>';
+        return;
+      }
+      users = await res.json();
+      renderUsers();
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('user-rows');
+      if (!users.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Keine Benutzer</td></tr>'; return; }
+
+      tbody.innerHTML = '';
+      users.forEach(u => {
+        const auth = [u.password_hash ? 'Lokal' : '', u.entra_oid ? 'Entra' : ''].filter(Boolean).join(', ') || '-';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(u.username)}</td>
+          <td>${esc(u.display_name || '')}</td>
+          <td>${esc(u.email || '')}</td>
+          <td>${esc(roleLabels[u.role] || u.role)}</td>
+          <td>${esc(auth)}</td>
+          <td>${u.is_active ? '<span class="state-on">Ja</span>' : '<span class="state-off">Nein</span>'}</td>
+          <td>${new Date(u.created_at).toLocaleDateString('de-DE')}</td>
+          <td>
+            <button class="btn-sm" onclick="editUser(${u.id})">Bearbeiten</button>
+            <button class="btn-sm ${u.is_active ? 'btn-danger' : 'btn-success'}" onclick="toggleActive(${u.id}, ${!u.is_active})">
+              ${u.is_active ? 'Deaktivieren' : 'Aktivieren'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function esc(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function openModal(title, user) {
+      editId = user ? user.id : null;
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('m-username').value = user?.username || '';
+      document.getElementById('m-username').disabled = !!user;
+      document.getElementById('m-displayname').value = user?.display_name || '';
+      document.getElementById('m-email').value = user?.email || '';
+      document.getElementById('m-role').value = user?.role || 'readonly';
+      document.getElementById('m-password').value = '';
+      document.getElementById('m-entra').value = user?.entra_oid || '';
+      document.getElementById('modal-error').style.display = 'none';
+      document.getElementById('user-modal').style.display = 'flex';
+    }
+
+    document.getElementById('add-user-btn').addEventListener('click', () => openModal('Benutzer anlegen', null));
+    document.getElementById('modal-cancel').addEventListener('click', () => {
+      document.getElementById('user-modal').style.display = 'none';
+    });
+
+    function editUser(id) {
+      const u = users.find(x => x.id === id);
+      if (u) openModal('Benutzer bearbeiten', u);
+    }
+
+    async function toggleActive(id, active) {
+      await fetch('/api/users.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: active }),
+      });
+      loadUsers();
+    }
+
+    document.getElementById('modal-save').addEventListener('click', async () => {
+      const errEl = document.getElementById('modal-error');
+      const body = {
+        username:     document.getElementById('m-username').value,
+        display_name: document.getElementById('m-displayname').value,
+        email:        document.getElementById('m-email').value,
+        role:         document.getElementById('m-role').value,
+        password:     document.getElementById('m-password').value,
+        entra_oid:    document.getElementById('m-entra').value,
+      };
+
+      if (editId) body.id = editId;
+      const method = editId ? 'PUT' : 'POST';
+
+      const res = await fetch('/api/users.php', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        errEl.textContent = data.error || 'Fehler';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      document.getElementById('user-modal').style.display = 'none';
+      loadUsers();
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('user-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'user-modal') e.target.style.display = 'none';
+    });
+
+    loadUsers();
+  </script>
+</body>
+</html>

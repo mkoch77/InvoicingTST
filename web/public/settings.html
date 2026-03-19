@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Einstellungen – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=5">
+</head>
+<body>
+  <div class="navbar">
+    <span class="brand">Accounting</span>
+    <nav>
+      <a href="/">Dashboard</a>
+      <div class="nav-dropdown">
+        <a href="#" class="nav-dropdown-toggle">Rohdaten</a>
+        <div class="nav-dropdown-menu">
+          <a href="/vms.html">VMs</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="page-header"><h1>Einstellungen</h1></div>
+
+    <div class="settings-grid">
+      <!-- Profile -->
+      <div class="settings-section">
+        <h2>Profil</h2>
+        <div class="form-group">
+          <label>Benutzername</label>
+          <input type="text" id="s-username" disabled />
+        </div>
+        <div class="form-group">
+          <label>Anzeigename</label>
+          <input type="text" id="s-displayname" />
+        </div>
+        <div class="form-group">
+          <label>E-Mail</label>
+          <input type="email" id="s-email" disabled />
+        </div>
+        <div class="form-group">
+          <label>Rolle</label>
+          <input type="text" id="s-role" disabled />
+        </div>
+        <button class="btn" id="save-profile-btn">Profil speichern</button>
+        <span id="profile-msg" class="settings-msg"></span>
+      </div>
+
+      <!-- Theme -->
+      <div class="settings-section">
+        <h2>Darstellung</h2>
+        <div class="theme-options">
+          <label class="theme-option">
+            <input type="radio" name="theme" value="system" checked />
+            <span class="theme-option-label">System</span>
+            <span class="theme-option-desc">Automatisch nach Betriebssystem</span>
+          </label>
+          <label class="theme-option">
+            <input type="radio" name="theme" value="dark" />
+            <span class="theme-option-label">Dark</span>
+            <span class="theme-option-desc">Dunkles Erscheinungsbild</span>
+          </label>
+          <label class="theme-option">
+            <input type="radio" name="theme" value="light" />
+            <span class="theme-option-label">Light</span>
+            <span class="theme-option-desc">Helles Erscheinungsbild</span>
+          </label>
+        </div>
+        <span id="theme-msg" class="settings-msg"></span>
+      </div>
+
+      <!-- Password -->
+      <div class="settings-section" id="password-section">
+        <h2>Passwort ändern</h2>
+        <div class="form-group">
+          <label for="s-curpw">Aktuelles Passwort</label>
+          <input type="password" id="s-curpw" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label for="s-newpw">Neues Passwort (min. 8 Zeichen)</label>
+          <input type="password" id="s-newpw" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label for="s-newpw2">Neues Passwort bestätigen</label>
+          <input type="password" id="s-newpw2" autocomplete="new-password" />
+        </div>
+        <button class="btn" id="save-pw-btn">Passwort ändern</button>
+        <span id="pw-msg" class="settings-msg"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=5"></script>
+  <script>
+    let settings = {};
+
+    async function loadSettings() {
+      const res = await fetch('/api/settings.php');
+      if (!res.ok) return;
+      settings = await res.json();
+      document.getElementById('s-username').value = settings.username || '';
+      document.getElementById('s-displayname').value = settings.display_name || '';
+      document.getElementById('s-email').value = settings.email || '';
+      document.getElementById('s-role').value = { admin: 'Administrator', operator: 'Operator', readonly: 'Nur Lesen' }[settings.role] || settings.role;
+      document.querySelector(`input[name="theme"][value="${settings.theme || 'system'}"]`).checked = true;
+      // Hide password section for SSO-only users
+      if (settings.entra_oid && !settings.username) {
+        document.getElementById('password-section').style.display = 'none';
+      }
+    }
+
+    // Theme radio: live preview + save
+    document.querySelectorAll('input[name="theme"]').forEach(r => {
+      r.addEventListener('change', async () => {
+        const theme = r.value;
+        applyTheme(theme);
+        const msg = document.getElementById('theme-msg');
+        const res = await fetch('/api/settings.php', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme }),
+        });
+        msg.textContent = res.ok ? 'Gespeichert' : 'Fehler';
+        msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
+        setTimeout(() => msg.textContent = '', 2000);
+      });
+    });
+
+    // Save profile
+    document.getElementById('save-profile-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('profile-msg');
+      const res = await fetch('/api/settings.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: document.getElementById('s-displayname').value }),
+      });
+      msg.textContent = res.ok ? 'Gespeichert' : (await res.json()).error || 'Fehler';
+      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
+      setTimeout(() => msg.textContent = '', 3000);
+    });
+
+    // Change password
+    document.getElementById('save-pw-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('pw-msg');
+      const newPw = document.getElementById('s-newpw').value;
+      const newPw2 = document.getElementById('s-newpw2').value;
+      if (newPw !== newPw2) {
+        msg.textContent = 'Passwörter stimmen nicht überein';
+        msg.className = 'settings-msg msg-err';
+        return;
+      }
+      if (newPw.length < 8) {
+        msg.textContent = 'Mindestens 8 Zeichen';
+        msg.className = 'settings-msg msg-err';
+        return;
+      }
+      const res = await fetch('/api/settings.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: document.getElementById('s-curpw').value,
+          new_password: newPw,
+        }),
+      });
+      const data = res.ok ? {} : await res.json();
+      msg.textContent = res.ok ? 'Passwort geändert' : data.error || 'Fehler';
+      msg.className = 'settings-msg ' + (res.ok ? 'msg-ok' : 'msg-err');
+      if (res.ok) {
+        document.getElementById('s-curpw').value = '';
+        document.getElementById('s-newpw').value = '';
+        document.getElementById('s-newpw2').value = '';
+      }
+      setTimeout(() => msg.textContent = '', 3000);
+    });
+
+    loadSettings();
+  </script>
+</body>
+</html>

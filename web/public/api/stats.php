@@ -1,8 +1,10 @@
 <?php
 
+require_once __DIR__ . '/../../src/middleware.php';
 require_once __DIR__ . '/../../src/vms.php';
 
 header('Content-Type: application/json');
+requireAuth();
 
 try {
     $months = fetchMonths();
