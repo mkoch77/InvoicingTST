@@ -566,17 +566,30 @@ RETURNING id
     # Look up power_state id by name
     $lookupPowerStateSql = "SELECT id FROM power_state WHERE name = @name"
 
-    # Insert VM row with foreign keys
+    # Upsert VM row: update on duplicate hostname+month
     $insertVmSql = @"
 INSERT INTO vm (hostname, dns_name, operating_system_id, vcpu, vram_mb,
                 used_storage_gb, provisioned_storage_gb, power_state_id)
 VALUES (@hostname, @dns_name, @operating_system_id, @vcpu, @vram_mb,
         @used_storage_gb, @provisioned_storage_gb, @power_state_id)
+ON CONFLICT (hostname, export_month) DO UPDATE SET
+    dns_name               = EXCLUDED.dns_name,
+    operating_system_id    = EXCLUDED.operating_system_id,
+    vcpu                   = EXCLUDED.vcpu,
+    vram_mb                = EXCLUDED.vram_mb,
+    used_storage_gb        = EXCLUDED.used_storage_gb,
+    provisioned_storage_gb = EXCLUDED.provisioned_storage_gb,
+    power_state_id         = EXCLUDED.power_state_id,
+    exported_at            = NOW()
 RETURNING id
 "@
 
-    # Insert individual IP address
-    $insertIpSql = "INSERT INTO vm_ip_address (vm_id, ip_address) VALUES (@vm_id, @ip_address::inet)"
+    # Upsert individual IP address (avoid duplicates)
+    $insertIpSql = @"
+INSERT INTO vm_ip_address (vm_id, ip_address)
+VALUES (@vm_id, @ip_address::inet)
+ON CONFLICT DO NOTHING
+"@
 
     try {
         Open-PostGreConnection -ConnectionString $ConnectionString
@@ -636,7 +649,9 @@ RETURNING id
                 }
                 $vmId = [int](Invoke-SqlScalar -Query $insertVmSql -Parameters $vmParams)
 
-                # Insert IP addresses (one row per address)
+                # Replace IP addresses: delete old ones first (handles changed IPs on upsert)
+                Invoke-SqlUpdate -Query "DELETE FROM vm_ip_address WHERE vm_id = @vm_id" -Parameters @{ vm_id = [int]$vmId } | Out-Null
+
                 $ipString = $row."IP Address"
                 if ($ipString) {
                     foreach ($ip in ($ipString -split ',\s*')) {

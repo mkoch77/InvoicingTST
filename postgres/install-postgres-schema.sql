@@ -44,6 +44,10 @@ CREATE INDEX IF NOT EXISTS idx_vm_hostname ON vm (hostname);
 CREATE INDEX IF NOT EXISTS idx_vm_exported_at ON vm (exported_at);
 CREATE INDEX IF NOT EXISTS idx_vm_ip_address_vm_id ON vm_ip_address (vm_id);
 
+-- Pro VM darf jede IP nur einmal gespeichert werden
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vm_ip_address_unique
+    ON vm_ip_address (vm_id, ip_address);
+
 -- Pro Hostname darf nur ein Eintrag pro Monat existieren
 CREATE UNIQUE INDEX IF NOT EXISTS idx_vm_hostname_month
     ON vm (hostname, export_month);
