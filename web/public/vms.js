@@ -1,11 +1,24 @@
 const monthSelect = document.getElementById('month-select');
 const searchInput = document.getElementById('search-input');
+const pageSizeSelect = document.getElementById('page-size');
 const vmRows = document.getElementById('vm-rows');
 const vmCount = document.getElementById('vm-count');
+const pagination = document.getElementById('pagination');
 
 let allVMs = [];
 let sortKey = 'hostname';
 let sortDir = 1; // 1 = asc, -1 = desc
+let currentPage = 1;
+
+function getPageSize() {
+  const val = pageSizeSelect.value;
+  return val === 'all' ? Infinity : parseInt(val, 10);
+}
+
+// ── Strip CIDR suffix (e.g. /32) from IP addresses ──
+function stripCidr(ip) {
+  return ip.replace(/\/\d+$/, '');
+}
 
 // ── Months dropdown ──
 async function loadMonths() {
@@ -35,62 +48,74 @@ async function loadVMs() {
   try {
     const res = await fetch(url);
     allVMs = await res.json();
+    currentPage = 1;
     renderTable();
   } catch (err) {
     vmRows.innerHTML = `<tr><td colspan="10" class="empty">Fehler: ${esc(err.message)}</td></tr>`;
   }
 }
 
-// ── Sort + Filter + Render ──
-function renderTable() {
+// ── Get filtered + sorted data ──
+function getFilteredSorted() {
   const query = searchInput.value.toLowerCase().trim();
 
-  // Filter
   let filtered = allVMs;
   if (query) {
     filtered = allVMs.filter(vm => {
       const searchable = [
         vm.hostname, vm.dns_name, vm.operating_system, vm.power_state,
-        (vm.ip_addresses || []).join(', ')
+        (vm.ip_addresses || []).map(stripCidr).join(', ')
       ].join(' ').toLowerCase();
       return searchable.includes(query);
     });
   }
 
-  // Sort
   const sorted = [...filtered].sort((a, b) => {
     let va = a[sortKey];
     let vb = b[sortKey];
 
-    // Handle arrays (ip_addresses)
     if (Array.isArray(va)) va = va.join(', ');
     if (Array.isArray(vb)) vb = vb.join(', ');
 
-    // Nulls last
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
 
-    // Numeric
     if (typeof va === 'number' && typeof vb === 'number') {
       return (va - vb) * sortDir;
     }
 
-    // String
     return String(va).localeCompare(String(vb), 'de') * sortDir;
   });
 
-  vmCount.textContent = `${sorted.length} von ${allVMs.length} VMs`;
+  return sorted;
+}
+
+// ── Sort + Filter + Paginate + Render ──
+function renderTable() {
+  const sorted = getFilteredSorted();
+  const pageSize = getPageSize();
+  const totalPages = pageSize === Infinity ? 1 : Math.max(1, Math.ceil(sorted.length / pageSize));
+
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = pageSize === Infinity ? 0 : (currentPage - 1) * pageSize;
+  const pageData = pageSize === Infinity ? sorted : sorted.slice(start, start + pageSize);
+
+  const fromNum = sorted.length === 0 ? 0 : start + 1;
+  const toNum = start + pageData.length;
+  vmCount.textContent = `${fromNum}–${toNum} von ${sorted.length} VMs`;
 
   if (sorted.length === 0) {
     vmRows.innerHTML = '<tr><td colspan="10" class="empty">Keine VMs gefunden.</td></tr>';
+    pagination.innerHTML = '';
     return;
   }
 
   vmRows.innerHTML = '';
-  for (const vm of sorted) {
+  for (const vm of pageData) {
     const tr = document.createElement('tr');
-    const ips = (vm.ip_addresses || []).join(', ');
+    const ips = (vm.ip_addresses || []).map(stripCidr).join(', ');
     const stateClass =
       vm.power_state === 'On' ? 'state-on' :
       vm.power_state === 'Off' ? 'state-off' :
@@ -110,6 +135,59 @@ function renderTable() {
     `;
     vmRows.appendChild(tr);
   }
+
+  renderPagination(totalPages);
+}
+
+// ── Pagination controls ──
+function renderPagination(totalPages) {
+  pagination.innerHTML = '';
+  if (totalPages <= 1) return;
+
+  const addBtn = (label, page, disabled, active) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.className = 'page-btn' + (active ? ' active' : '');
+    btn.disabled = disabled;
+    if (!disabled && !active) {
+      btn.addEventListener('click', () => { currentPage = page; renderTable(); });
+    }
+    pagination.appendChild(btn);
+  };
+
+  addBtn('\u00AB', 1, currentPage === 1, false);
+  addBtn('\u2039', currentPage - 1, currentPage === 1, false);
+
+  // Show max 7 page numbers with ellipsis
+  const maxVisible = 7;
+  let pages = [];
+  if (totalPages <= maxVisible) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    let rangeStart = Math.max(2, currentPage - 2);
+    let rangeEnd = Math.min(totalPages - 1, currentPage + 2);
+    if (currentPage <= 3) rangeEnd = Math.min(totalPages - 1, 5);
+    if (currentPage >= totalPages - 2) rangeStart = Math.max(2, totalPages - 4);
+    if (rangeStart > 2) pages.push('...');
+    for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+    if (rangeEnd < totalPages - 1) pages.push('...');
+    pages.push(totalPages);
+  }
+
+  for (const p of pages) {
+    if (p === '...') {
+      const span = document.createElement('span');
+      span.className = 'page-ellipsis';
+      span.textContent = '...';
+      pagination.appendChild(span);
+    } else {
+      addBtn(String(p), p, false, p === currentPage);
+    }
+  }
+
+  addBtn('\u203A', currentPage + 1, currentPage === totalPages, false);
+  addBtn('\u00BB', totalPages, currentPage === totalPages, false);
 }
 
 // ── Sort click handler ──
@@ -123,11 +201,11 @@ document.querySelectorAll('thead th[data-key]').forEach(th => {
       sortDir = 1;
     }
 
-    // Update arrow indicators
     document.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted'));
     th.classList.add('sorted');
     th.querySelector('.sort-arrow').textContent = sortDir === 1 ? '\u25B2' : '\u25BC';
 
+    currentPage = 1;
     renderTable();
   });
 });
@@ -135,10 +213,15 @@ document.querySelectorAll('thead th[data-key]').forEach(th => {
 // ── Events ──
 monthSelect.addEventListener('change', loadVMs);
 
+pageSizeSelect.addEventListener('change', () => {
+  currentPage = 1;
+  renderTable();
+});
+
 let searchTimeout;
 searchInput.addEventListener('input', () => {
   clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(renderTable, 150);
+  searchTimeout = setTimeout(() => { currentPage = 1; renderTable(); }, 150);
 });
 
 // ── Excel export ──
@@ -150,7 +233,6 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 function formatDate(val) {
   if (!val) return '';
-  // PostgreSQL gibt "2026-02-15 00:00:00+00" zurueck — in ISO umwandeln
   const iso = val.replace(' ', 'T').replace(/\+(\d{2})$/, '+$1:00');
   const d = new Date(iso);
   if (isNaN(d)) return val;

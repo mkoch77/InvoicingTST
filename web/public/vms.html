@@ -29,6 +29,14 @@
           <option value="">Alle</option>
         </select>
         <input type="text" id="search-input" placeholder="Suchen…" />
+        <label for="page-size">Zeilen:</label>
+        <select id="page-size">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="all">Alle</option>
+        </select>
         <span id="vm-count" class="count"></span>
         <button id="export-btn" class="btn" title="Als Excel exportieren">&#x2B07; Excel</button>
       </div>
@@ -55,7 +63,8 @@
         </tbody>
       </table>
     </div>
+    <div id="pagination" class="pagination"></div>
   </div>
-  <script src="/vms.js?v=2"></script>
+  <script src="/vms.js?v=3"></script>
 </body>
 </html>

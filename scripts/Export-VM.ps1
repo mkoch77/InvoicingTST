@@ -600,7 +600,7 @@ ON CONFLICT DO NOTHING
         $checkMonthSql = "SELECT COUNT(*) FROM vm WHERE export_month = @month"
         $existingCount = [int](Invoke-SqlScalar -Query $checkMonthSql -Parameters @{ month = [string]$currentMonth })
         if ($existingCount -gt 0) {
-            Write-Log "Monat $currentMonth: $existingCount VMs vorhanden — Daten werden per Upsert aktualisiert." -Level INFO -ForegroundColor Yellow
+            Write-Log "Monat ${currentMonth}: ${existingCount} VMs vorhanden — Daten werden per Upsert aktualisiert." -Level INFO -ForegroundColor Yellow
         }
 
         # Cache for already-resolved lookup values
