@@ -80,7 +80,7 @@ try {
     $sessionToken = createSession((int) $user['id'], $ip, $_SERVER['HTTP_USER_AGENT'] ?? null);
     setSessionCookie($sessionToken);
 
-    header('Location: /');
+    header('Location: /it/');
     exit;
 
 } catch (Exception $e) {

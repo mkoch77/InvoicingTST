@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IT Konfigurator – Kundenportal</title>
+  <link rel="stylesheet" href="/style.css?v=12">
+  <style>
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+    .cfg-header {
+      background: var(--navbar-bg); border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    .cfg-header h1 { font-size: 1.25rem; font-weight: 600; }
+    .cfg-header .cfg-meta { color: var(--text-muted); font-size: 0.85rem; }
+
+    .cfg-layout { display: flex; gap: 0; min-height: calc(100vh - 60px); }
+    .cfg-left { flex: 1; display: flex; min-width: 0; }
+
+    .cfg-steps {
+      width: 220px; min-width: 220px; background: var(--bg-card);
+      border-right: 1px solid var(--border); padding: 1.5rem 0;
+    }
+    .cfg-step {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.75rem 1.25rem; cursor: pointer;
+      color: var(--text-muted); transition: all 0.15s; border-left: 3px solid transparent;
+    }
+    .cfg-step:hover { background: var(--bg-input); color: var(--text); }
+    .cfg-step.active { color: var(--text); border-left-color: var(--success); background: var(--bg-input); }
+    .cfg-step.completed .step-num { background: var(--success); color: #fff; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border); flex-shrink: 0;
+    }
+    .step-label { font-size: 0.9rem; }
+
+    .cfg-form { flex: 1; padding: 2rem; overflow-y: auto; min-width: 0; }
+    .cfg-form h2 { margin-bottom: 0.25rem; font-size: 1.2rem; }
+    .cfg-form .step-desc { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .cfg-form-content { display: none; }
+    .cfg-form-content.active { display: block; }
+
+    .cfg-field { margin-bottom: 1.25rem; }
+    .cfg-field label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .cfg-field input, .cfg-field select {
+      width: 100%; max-width: 400px; padding: 0.6rem 0.75rem;
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 0.95rem;
+    }
+    .cfg-field input:focus, .cfg-field select:focus { outline: none; border-color: var(--success); }
+    .cfg-field input[type="number"] { max-width: 160px; }
+
+    .cfg-row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .cfg-row .cfg-field { flex: 1; min-width: 180px; }
+
+    .cfg-nav { display: flex; gap: 0.75rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+    .cfg-nav .btn { min-width: 120px; }
+
+    .cfg-summary {
+      width: 380px; min-width: 380px; background: var(--bg-card);
+      border-left: 1px solid var(--border); padding: 1.5rem; overflow-y: auto;
+    }
+    .cfg-summary h2 { font-size: 1.1rem; margin-bottom: 1.25rem; }
+
+    .summary-totals { background: var(--bg-input); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+    .summary-total-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; font-size: 0.95rem; }
+    .summary-total-row.big { font-size: 1.1rem; font-weight: 700; padding-top: 0.75rem; border-top: 1px solid var(--border); margin-top: 0.5rem; }
+    .summary-total-row .amount { font-weight: 600; }
+
+    .summary-section { margin-bottom: 1.5rem; }
+    .summary-section h3 { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .summary-line { display: flex; justify-content: space-between; align-items: baseline; padding: 0.3rem 0; font-size: 0.9rem; }
+    .summary-line .label { color: var(--text-muted); }
+    .summary-line .value { font-weight: 500; }
+    .summary-line .value.monthly::after { content: " /Monat"; font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+    .summary-line .value.once::after { content: " einmalig"; font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+
+    .summary-divider { border: none; border-top: 1px dashed var(--border); margin: 1rem 0; }
+    .summary-assumptions { margin-top: 1rem; }
+    .summary-assumptions h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+    .summary-assumptions ul { list-style: none; padding: 0; }
+    .summary-assumptions li { font-size: 0.8rem; color: var(--text-muted); padding: 0.15rem 0; }
+    .summary-assumptions li::before { content: "\2022"; margin-right: 0.4rem; }
+
+    @media (max-width: 1100px) {
+      .cfg-layout { flex-direction: column; }
+      .cfg-left { flex-direction: column; }
+      .cfg-steps { width: 100%; min-width: 0; display: flex; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 0; }
+      .cfg-step { border-left: none; border-bottom: 3px solid transparent; white-space: nowrap; }
+      .cfg-step.active { border-bottom-color: var(--success); border-left-color: transparent; }
+      .cfg-summary { width: 100%; min-width: 0; border-left: none; border-top: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cfg-header">
+    <h1>Kalkulator Kundengeschäft</h1>
+    <div class="cfg-meta">
+      <span>Projekt: <strong id="hdr-project">–</strong></span>
+      &nbsp;&middot;&nbsp;
+      <span>Standort: <strong id="hdr-location">–</strong></span>
+    </div>
+  </div>
+
+  <div class="cfg-layout">
+    <div class="cfg-left">
+      <div class="cfg-steps" id="step-nav">
+        <div class="cfg-step active" data-step="1"><span class="step-num">1</span><span class="step-label">Basisdaten</span></div>
+        <div class="cfg-step" data-step="2"><span class="step-num">2</span><span class="step-label">Fläche &amp; Netzwerk</span></div>
+        <div class="cfg-step" data-step="3"><span class="step-num">3</span><span class="step-label">Arbeitsplätze &amp; Lizenzen</span></div>
+        <div class="cfg-step" data-step="4"><span class="step-num">4</span><span class="step-label">Ergebnis</span></div>
+      </div>
+
+      <div class="cfg-form">
+
+        <!-- Step 1: Basisdaten -->
+        <div class="cfg-form-content active" id="form-1">
+          <h2>Basisdaten</h2>
+          <p class="step-desc">Grundlegende Informationen zum Projekt</p>
+          <div class="cfg-field">
+            <label for="f-project">Projektname</label>
+            <input type="text" id="f-project" placeholder="z.B. Neukunde BASF Ludwigshafen" />
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-location">Standort</label>
+              <input type="text" id="f-location" placeholder="z.B. Ludwigshafen" />
+            </div>
+            <div class="cfg-field">
+              <label for="f-customer">Kundenkürzel</label>
+              <select id="f-customer"><option value="">Bitte wählen…</option><option value="__NEW__">Neukunde (kein Kürzel)</option></select>
+            </div>
+          </div>
+          <div id="new-customer-fields" style="display:none;">
+            <div class="cfg-field">
+              <label for="f-new-customer-name">Name des Neukunden</label>
+              <input type="text" id="f-new-customer-name" placeholder="z.B. BASF SE" />
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-start">Geplanter Start</label>
+              <input type="month" id="f-start" />
+            </div>
+            <div class="cfg-field">
+              <label for="f-duration">Vertragslaufzeit (Monate)</label>
+              <input type="number" id="f-duration" value="36" min="1" max="120" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Fläche & Netzwerk -->
+        <div class="cfg-form-content" id="form-2">
+          <h2>Fläche &amp; Netzwerk</h2>
+          <p class="step-desc">Netzwerk-Infrastruktur und Flächenversorgung</p>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-area">Fläche (m²)</label>
+              <input type="number" id="f-area" value="0" min="0" />
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-aps">Access Points (Unify)</label>
+              <input type="number" id="f-aps" value="0" min="0" />
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-switches">Switches</label>
+              <input type="number" id="f-switches" value="0" min="0" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Arbeitsplätze & Lizenzen -->
+        <div class="cfg-form-content" id="form-3">
+          <h2>Arbeitsplätze &amp; Lizenzen</h2>
+          <p class="step-desc">Arbeitsplatz-Typen und Software-Lizenzen</p>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-wp-admin">Admin Workplaces</label>
+              <input type="number" id="f-wp-admin" value="0" min="0" />
+            </div>
+            <div class="cfg-field">
+              <label for="f-wp-operative">Operative Workplaces</label>
+              <input type="number" id="f-wp-operative" value="0" min="0" />
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-wp-scanner">Scanner-Arbeitsplätze</label>
+              <input type="number" id="f-wp-scanner" value="0" min="0" />
+            </div>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0;">
+          <div class="cfg-row">
+            <div class="cfg-field">
+              <label for="f-lic-m365">M365 Lizenzen</label>
+              <input type="number" id="f-lic-m365" value="0" min="0" />
+            </div>
+            <div class="cfg-field">
+              <label for="f-lic-erp">ERP Lizenzen</label>
+              <input type="number" id="f-lic-erp" value="0" min="0" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Ergebnis -->
+        <div class="cfg-form-content" id="form-4">
+          <h2>Ergebnis</h2>
+          <p class="step-desc">Zusammenfassung der Kalkulation</p>
+          <div id="result-detail"></div>
+          <div class="cfg-nav" style="border-top:none;padding-top:0;margin-top:1.5rem;">
+            <button class="btn" onclick="window.print()">Drucken / PDF</button>
+          </div>
+        </div>
+
+        <div class="cfg-nav" id="cfg-nav">
+          <button class="btn btn-secondary" id="btn-prev" style="display:none;">Zurück</button>
+          <button class="btn" id="btn-next">Weiter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Summary -->
+    <div class="cfg-summary">
+      <h2>Live Summary</h2>
+      <div class="summary-totals">
+        <div class="summary-total-row">
+          <span>Gesamt monatlich:</span>
+          <span class="amount" id="sum-monthly">0,00 &euro;</span>
+        </div>
+        <div class="summary-total-row">
+          <span>Gesamt einmalig:</span>
+          <span class="amount" id="sum-once">0,00 &euro;</span>
+        </div>
+      </div>
+      <div class="summary-section" id="sum-positions"></div>
+      <hr class="summary-divider">
+      <div class="summary-assumptions">
+        <h3>Annahmen</h3>
+        <ul>
+          <li>Rundung: 2 Nachkommastellen</li>
+          <li>Alle Preise zzgl. MwSt.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Pricing from backend ──
+    let pricing = {};
+
+    async function loadPricing() {
+      try {
+        const res = await fetch('/api/configurator.php');
+        if (res.ok) pricing = await res.json();
+      } catch (e) { /* use defaults */ }
+      updateSummary();
+    }
+
+    // ── State ──
+    let currentStep = 1;
+    const totalSteps = 4;
+
+    // ── Neukunde toggle ──
+    document.getElementById('f-customer').addEventListener('change', function() {
+      document.getElementById('new-customer-fields').style.display = this.value === '__NEW__' ? '' : 'none';
+    });
+
+    // ── Step Navigation ──
+    function goToStep(step) {
+      if (step < 1 || step > totalSteps) return;
+      for (let i = 1; i < step; i++) document.querySelector(`.cfg-step[data-step="${i}"]`).classList.add('completed');
+      currentStep = step;
+      document.querySelectorAll('.cfg-step').forEach(s => s.classList.toggle('active', parseInt(s.dataset.step) === step));
+      document.querySelectorAll('.cfg-form-content').forEach(f => f.classList.toggle('active', f.id === 'form-' + step));
+      document.getElementById('btn-prev').style.display = step > 1 ? '' : 'none';
+      document.getElementById('btn-next').textContent = step < totalSteps ? 'Weiter' : 'Abschließen';
+      document.getElementById('cfg-nav').style.display = step === totalSteps ? 'none' : '';
+      if (step === totalSteps) renderResult();
+      document.getElementById('hdr-project').textContent = document.getElementById('f-project').value || '–';
+      document.getElementById('hdr-location').textContent = document.getElementById('f-location').value || '–';
+    }
+
+    document.querySelectorAll('.cfg-step').forEach(s => s.addEventListener('click', () => goToStep(parseInt(s.dataset.step))));
+    document.getElementById('btn-next').addEventListener('click', () => goToStep(currentStep + 1));
+    document.getElementById('btn-prev').addEventListener('click', () => goToStep(currentStep - 1));
+
+    // ── Calculation ──
+    function calc() {
+      const v = (id) => parseFloat(document.getElementById(id).value) || 0;
+      const p = pricing;
+      const margin = 1 + (p.margin_percent || 15) / 100;
+
+      const positions = [];
+
+      const netMonthly = v('f-area') * (p.network_price_per_sqm || 10);
+      if (netMonthly > 0) positions.push({ label: `Netzwerk (${v('f-area')} m²)`, monthly: netMonthly * margin, once: 0 });
+
+      const apOnce = v('f-aps') * (p.ap_price || 600);
+      if (apOnce > 0) positions.push({ label: `APs Unify (${v('f-aps')}x)`, monthly: 0, once: apOnce * margin });
+
+      const swMonthly = v('f-switches') * (p.switch_price_monthly || 150);
+      if (swMonthly > 0) positions.push({ label: `Switches (${v('f-switches')}x)`, monthly: swMonthly * margin, once: 0 });
+
+      const adminMonthly = v('f-wp-admin') * (p.wp_admin_price_monthly || 120);
+      if (adminMonthly > 0) positions.push({ label: `Admin Workplaces (${v('f-wp-admin')}x)`, monthly: adminMonthly * margin, once: 0 });
+
+      const opMonthly = v('f-wp-operative') * (p.wp_operative_price_monthly || 80);
+      if (opMonthly > 0) positions.push({ label: `Operative WP (${v('f-wp-operative')}x)`, monthly: opMonthly * margin, once: 0 });
+
+      const scanMonthly = v('f-wp-scanner') * (p.wp_scanner_price_monthly || 45);
+      if (scanMonthly > 0) positions.push({ label: `Scanner WP (${v('f-wp-scanner')}x)`, monthly: scanMonthly * margin, once: 0 });
+
+      const m365Monthly = v('f-lic-m365') * (p.lic_m365_price_monthly || 22);
+      if (m365Monthly > 0) positions.push({ label: `M365 Lizenzen (${v('f-lic-m365')}x)`, monthly: m365Monthly * margin, once: 0 });
+
+      const erpMonthly = v('f-lic-erp') * (p.lic_erp_price_monthly || 85);
+      if (erpMonthly > 0) positions.push({ label: `ERP Lizenzen (${v('f-lic-erp')}x)`, monthly: erpMonthly * margin, once: 0 });
+
+      return {
+        positions,
+        totalMonthly: positions.reduce((s, p) => s + p.monthly, 0),
+        totalOnce: positions.reduce((s, p) => s + p.once, 0),
+      };
+    }
+
+    function eur(val) {
+      return val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC';
+    }
+
+    function updateSummary() {
+      const { positions, totalMonthly, totalOnce } = calc();
+      document.getElementById('sum-monthly').textContent = eur(totalMonthly);
+      document.getElementById('sum-once').textContent = eur(totalOnce);
+
+      const div = document.getElementById('sum-positions');
+      if (!positions.length) {
+        div.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">Noch keine Positionen</p>';
+      } else {
+        div.innerHTML = '<h3>Positionen</h3>' + positions.map(p => `
+          <div class="summary-line">
+            <span class="label">${p.label}</span>
+            <span class="value ${p.monthly > 0 ? 'monthly' : 'once'}">${eur(p.monthly > 0 ? p.monthly : p.once)}</span>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('hdr-project').textContent = document.getElementById('f-project').value || '–';
+      document.getElementById('hdr-location').textContent = document.getElementById('f-location').value || '–';
+    }
+
+    function renderResult() {
+      const { positions, totalMonthly, totalOnce } = calc();
+      const duration = parseInt(document.getElementById('f-duration').value) || 36;
+      const totalContract = totalMonthly * duration + totalOnce;
+
+      let html = '<div class="summary-totals" style="margin-bottom:1.5rem;">';
+      html += `<div class="summary-total-row"><span>Monatlich</span><span class="amount">${eur(totalMonthly)}</span></div>`;
+      html += `<div class="summary-total-row"><span>Einmalig</span><span class="amount">${eur(totalOnce)}</span></div>`;
+      html += `<div class="summary-total-row big"><span>Gesamtvertragswert (${duration} Mon.)</span><span class="amount">${eur(totalContract)}</span></div>`;
+      html += '</div>';
+
+      if (positions.length) {
+        html += '<h3 style="margin-bottom:0.75rem;">Positionen</h3><div class="table-wrap"><table><thead><tr><th>Position</th><th style="text-align:right;">Monatlich</th><th style="text-align:right;">Einmalig</th></tr></thead><tbody>';
+        positions.forEach(p => {
+          html += `<tr><td>${p.label}</td><td style="text-align:right;">${p.monthly > 0 ? eur(p.monthly) : '–'}</td><td style="text-align:right;">${p.once > 0 ? eur(p.once) : '–'}</td></tr>`;
+        });
+        html += `<tr style="font-weight:700;border-top:2px solid var(--border);"><td>Gesamt</td><td style="text-align:right;">${eur(totalMonthly)}</td><td style="text-align:right;">${eur(totalOnce)}</td></tr>`;
+        html += '</tbody></table></div>';
+      }
+
+      document.getElementById('result-detail').innerHTML = html;
+    }
+
+    // ── Bind inputs ──
+    document.querySelectorAll('.cfg-form input, .cfg-form select').forEach(el => {
+      el.addEventListener('input', updateSummary);
+      el.addEventListener('change', updateSummary);
+    });
+
+    // ── Load customers ──
+    async function loadCustomers() {
+      try {
+        const res = await fetch('/api/customers.php');
+        if (!res.ok) return;
+        const customers = await res.json();
+        const sel = document.getElementById('f-customer');
+        customers.filter(c => c.is_active).forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.code;
+          opt.textContent = `${c.code} – ${c.name}`;
+          sel.appendChild(opt);
+        });
+      } catch (e) { /* ignore */ }
+    }
+
+    // ── Init ──
+    loadPricing();
+    loadCustomers();
+  </script>
+</body>
+</html>

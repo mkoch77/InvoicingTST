@@ -18,13 +18,15 @@ WORKDIR /var/www
 COPY composer.json composer.lock* ./
 RUN composer install --no-dev --optimize-autoloader
 
-# Apache DocumentRoot auf public/ setzen
+# Apache DocumentRoot auf public/ setzen + AllowOverride fuer .htaccess
 ENV APACHE_DOCUMENT_ROOT=/var/www/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
-    /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf
+    /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf \
+    && sed -ri -e 's/AllowOverride None/AllowOverride All/g' \
+    /etc/apache2/apache2.conf
 
-# Cron installieren
-RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
+# Cron, pg_dump (Backup), sshpass/lftp (Remote-Backup) installieren
+RUN apt-get update && apt-get install -y cron postgresql-client sshpass lftp openssh-client && rm -rf /var/lib/apt/lists/*
 
 # Quellcode kopieren und Berechtigungen fuer www-data setzen
 COPY . /var/www/
@@ -32,9 +34,10 @@ RUN chown -R www-data:www-data /var/www \
     && find /var/www -type d -exec chmod 755 {} \; \
     && find /var/www -type f -exec chmod 644 {} \;
 
-# Cron-Job: CMDB Sync stündlich (sourced env vars)
+# Cron-Jobs
 RUN echo '0 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-customers.php >> /var/log/cron-sync.log 2>&1' > /etc/cron.d/cmdb-sync \
-    && chmod 644 /etc/cron.d/cmdb-sync
+    && echo '* * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/backup.php >> /var/log/cron-backup.log 2>&1' > /etc/cron.d/backup \
+    && chmod 644 /etc/cron.d/cmdb-sync /etc/cron.d/backup
 
 # Startup: export env vars for cron, then start cron + Apache
 RUN printf '#!/bin/bash\n\

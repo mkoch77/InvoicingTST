@@ -1,0 +1,14 @@
+RewriteEngine On
+
+# /it/ → IT Portal Dashboard
+RewriteRule ^it/?$ /index.html [L]
+
+# /stammdaten/ → Stammdaten index
+RewriteRule ^stammdaten/?$ /stammdaten/index.html [QSA,L]
+
+# /admin/ → Administration index (tabs)
+RewriteRule ^admin/?$ /admin/index.html [QSA,L]
+
+# Root → Kundenportal
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^$ /customer/index.html [L]

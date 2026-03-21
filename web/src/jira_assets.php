@@ -257,7 +257,12 @@ class JiraAssetsClient
 
     public function getObjectTypes(int $schemaId): array
     {
-        return $this->request('GET', $this->assetsUrl("/objectschema/{$schemaId}/objecttypes"));
+        // Non-flat has correct objectCount; flat works for all schemas
+        $result = $this->request('GET', $this->assetsUrl("/objectschema/{$schemaId}/objecttypes"));
+        if (!empty($result)) {
+            return $result;
+        }
+        return $this->request('GET', $this->assetsUrl("/objectschema/{$schemaId}/objecttypes/flat"));
     }
 
     public function getSchemas(): array

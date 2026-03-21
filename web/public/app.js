@@ -10,7 +10,9 @@ async function initApp() {
   try {
     const res = await fetch('/api/auth/me.php');
     if (res.status === 401) {
-      if (!window.location.pathname.startsWith('/login')) {
+      if (!window.location.pathname.startsWith('/login')
+          && !window.location.pathname.startsWith('/customer')
+          && window.location.pathname !== '/') {
         window.location.href = '/login.html';
       }
       return;
@@ -45,8 +47,9 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 // ── Sidebar ──
 function buildSidebar() {
-  // Don't build sidebar on login page
+  // Don't build sidebar on login or customer pages
   if (window.location.pathname.startsWith('/login')) return;
+  if (window.location.pathname.startsWith('/customer') || window.location.pathname === '/') return;
 
   const path = window.location.pathname;
 
@@ -56,11 +59,11 @@ function buildSidebar() {
   sidebar.innerHTML = `
     <div class="sidebar-header">
       <button class="sidebar-toggle" id="sidebar-toggle" title="Menü ein-/ausklappen">&#9776;</button>
-      <span class="sidebar-brand">Accounting</span>
+      <a href="/it/" class="sidebar-brand" style="text-decoration:none;color:inherit;">IT Portal</a>
     </div>
     <nav class="sidebar-nav">
       <div class="sidebar-section">
-        <a href="/" class="sidebar-link ${path === '/' || path === '/index.html' ? 'active' : ''}">
+        <a href="/it/" class="sidebar-link ${path === '/it/' || path === '/it' || path === '/index.html' ? 'active' : ''}">
           <span class="icon">&#x1F4CA;</span><span class="label">Dashboard</span>
         </a>
       </div>
@@ -72,26 +75,14 @@ function buildSidebar() {
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Einstellungen</div>
-        <a href="/stammdaten/customers.html" class="sidebar-link ${path === '/stammdaten/customers.html' ? 'active' : ''}">
-          <span class="icon">&#x1F465;</span><span class="label">Kundenkürzel</span>
-        </a>
-        <a href="/stammdaten/pricing.html" class="sidebar-link ${path === '/stammdaten/pricing.html' ? 'active' : ''}">
-          <span class="icon">&#x1F4B0;</span><span class="label">Preisklassen</span>
+        <a href="/stammdaten/" class="sidebar-link ${path.startsWith('/stammdaten') ? 'active' : ''}">
+          <span class="icon">&#x1F4C1;</span><span class="label">Stammdaten</span>
         </a>
         <a href="/admin/vault.html" class="sidebar-link ${path === '/admin/vault.html' ? 'active' : ''}">
           <span class="icon">&#x1F512;</span><span class="label">Vault</span>
         </a>
-      </div>
-      <div class="sidebar-section" id="sidebar-admin-section" style="display:none;">
-        <div class="sidebar-section-title">Administration</div>
-        <a href="/admin/users.html" class="sidebar-link ${path === '/admin/users.html' ? 'active' : ''}">
-          <span class="icon">&#x1F6E1;</span><span class="label">Benutzerverwaltung</span>
-        </a>
-        <a href="/cmdb.html" class="sidebar-link ${path === '/cmdb.html' ? 'active' : ''}">
-          <span class="icon">&#x1F4E6;</span><span class="label">CMDB Browser</span>
-        </a>
-        <a href="/admin/logs.html" class="sidebar-link ${path === '/admin/logs.html' ? 'active' : ''}">
-          <span class="icon">&#x1F4CB;</span><span class="label">Logs</span>
+        <a href="/admin/" class="sidebar-link ${path.startsWith('/admin/') && path !== '/admin/vault.html' ? 'active' : ''}" id="sidebar-admin-link" style="display:none;">
+          <span class="icon">&#x2699;</span><span class="label">Administration</span>
         </a>
       </div>
     </nav>
@@ -134,8 +125,8 @@ function restoreSidebarState() {
 function updateSidebarAdmin() {
   if (!currentUser) return;
   if (currentUser.role === 'admin') {
-    const section = document.getElementById('sidebar-admin-section');
-    if (section) section.style.display = '';
+    const link = document.getElementById('sidebar-admin-link');
+    if (link) link.style.display = '';
   }
 }
 

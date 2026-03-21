@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administration – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=11">
+  <style>
+    .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .admin-tab {
+      padding: 0.75rem 1.25rem; cursor: pointer; border: none; background: none;
+      color: var(--text-muted); font-size: 0.95rem; border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s; white-space: nowrap;
+    }
+    .admin-tab:hover { color: var(--text); }
+    .admin-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Administration</h1>
+    </div>
+
+    <div class="admin-tabs" id="admin-tabs">
+      <button class="admin-tab active" data-tab="users">Benutzer</button>
+      <button class="admin-tab" data-tab="cmdb">CMDB Browser</button>
+      <button class="admin-tab" data-tab="backup">Backup</button>
+      <button class="admin-tab" data-tab="logs">Logs</button>
+    </div>
+
+    <!-- ═══ TAB: Benutzer ═══ -->
+    <div class="tab-content active" id="tab-users">
+      <div class="controls" style="margin-bottom:1rem;">
+        <button class="btn" id="add-user-btn">+ Benutzer anlegen</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Benutzername</th><th>Anzeigename</th><th>E-Mail</th>
+            <th>Rolle</th><th>Auth</th><th>Aktiv</th><th>Erstellt</th><th>Aktionen</th>
+          </tr></thead>
+          <tbody id="user-rows"><tr><td colspan="8" class="empty">Lade Benutzer…</td></tr></tbody>
+        </table>
+      </div>
+      <!-- User Modal -->
+      <div id="user-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+          <h2 id="modal-title">Benutzer anlegen</h2>
+          <div class="form-group"><label for="m-username">Benutzername *</label><input type="text" id="m-username" /></div>
+          <div class="form-group"><label for="m-displayname">Anzeigename</label><input type="text" id="m-displayname" /></div>
+          <div class="form-group"><label for="m-email">E-Mail</label><input type="email" id="m-email" /></div>
+          <div class="form-group"><label for="m-role">Rolle</label>
+            <select id="m-role"><option value="readonly">Nur Lesen</option><option value="operator">Operator</option><option value="admin">Administrator</option></select>
+          </div>
+          <div class="form-group"><label for="m-password">Passwort (min. 8 Zeichen)</label><input type="password" id="m-password" autocomplete="new-password" /></div>
+          <div class="form-group"><label for="m-entra">Entra ID (Object ID, optional)</label><input type="text" id="m-entra" /></div>
+          <div id="modal-error" class="login-error" style="display:none;"></div>
+          <div class="modal-actions">
+            <button class="btn" id="modal-save">Speichern</button>
+            <button class="btn btn-secondary" id="modal-cancel">Abbrechen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: CMDB Browser ═══ -->
+    <div class="tab-content" id="tab-cmdb">
+      <div class="controls" style="margin-bottom:1rem;flex-wrap:wrap;">
+        <select id="cmdb-schema"><option value="">Schema wählen…</option></select>
+        <select id="cmdb-type" disabled><option value="">Objekttyp wählen…</option></select>
+        <input type="text" id="cmdb-search" placeholder="AQL Suche…" style="flex:1;min-width:200px;" />
+        <button class="btn" id="cmdb-search-btn">Suchen</button>
+        <span id="cmdb-status" class="count"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Name</th><th>Typ</th><th>Erstellt</th><th>Geändert</th><th></th></tr></thead>
+          <tbody id="cmdb-rows"><tr><td colspan="6" class="empty">Schema und Objekttyp wählen</td></tr></tbody>
+        </table>
+      </div>
+      <div id="cmdb-pagination" class="controls" style="justify-content:center;gap:.5rem;margin-top:1rem;"></div>
+      <!-- Detail panel -->
+      <div id="cmdb-detail" class="settings-section" style="display:none;margin-top:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 id="cmdb-detail-title"></h2>
+          <button class="btn btn-secondary" id="cmdb-detail-close">Schließen</button>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Attribut</th><th>Wert</th></tr></thead>
+          <tbody id="cmdb-detail-rows"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: Backup ═══ -->
+    <div class="tab-content" id="tab-backup">
+      <div class="settings-grid">
+        <!-- Backup erstellen -->
+        <div class="settings-section">
+          <h2>Manuelles Backup</h2>
+          <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Erstellt ein Backup der PostgreSQL-Datenbank.</p>
+          <button class="btn" id="backup-create-btn">Backup jetzt erstellen</button>
+          <div id="backup-create-status" style="margin-top:0.75rem;"></div>
+        </div>
+
+        <!-- Zeitplan -->
+        <div class="settings-section">
+          <h2>Zeitplan</h2>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+              <span class="toggle"><input type="checkbox" id="bk-schedule-enabled" /><span class="slider"></span></span>
+              Automatische Backups aktiviert
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="bk-schedule-time">Uhrzeit</label>
+            <input type="time" id="bk-schedule-time" value="02:00" />
+          </div>
+          <div class="form-group">
+            <label>Wochentage</label>
+            <div id="bk-schedule-days" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
+          </div>
+          <div class="form-group">
+            <label for="bk-retention">Aufbewahrung (Anzahl Backups)</label>
+            <input type="number" id="bk-retention" min="1" max="365" value="7" style="width:80px;" />
+          </div>
+        </div>
+
+        <!-- Verschlüsselung -->
+        <div class="settings-section">
+          <h2>Verschlüsselung</h2>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+              <span class="toggle"><input type="checkbox" id="bk-encrypt-enabled" /><span class="slider"></span></span>
+              Backups verschlüsseln (AES-256-GCM)
+            </label>
+          </div>
+          <p style="color:var(--text-muted);font-size:0.85rem;">
+            Schlüssel wird im Vault unter <code>backup_encryption_key</code> gespeichert.
+          </p>
+        </div>
+
+        <!-- Remote -->
+        <div class="settings-section">
+          <h2>Remote-Kopie</h2>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:0.5rem;">
+              <span class="toggle"><input type="checkbox" id="bk-remote-enabled" /><span class="slider"></span></span>
+              Backup auf Remote-Server kopieren
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="bk-remote-type">Protokoll</label>
+            <select id="bk-remote-type"><option value="sftp">SFTP</option><option value="ftp">FTP</option></select>
+          </div>
+          <div class="form-group">
+            <label for="bk-remote-host">Host</label>
+            <input type="text" id="bk-remote-host" placeholder="backup.example.com" />
+          </div>
+          <div class="form-group">
+            <label for="bk-remote-port">Port</label>
+            <input type="number" id="bk-remote-port" value="22" style="width:80px;" />
+          </div>
+          <div class="form-group">
+            <label for="bk-remote-path">Remote-Pfad</label>
+            <input type="text" id="bk-remote-path" placeholder="/backups" />
+          </div>
+          <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.5rem;">
+            Zugangsdaten im Vault unter <code>backup_remote_credentials</code> (JSON: <code>{"user":"...","password":"..."}</code>)
+          </p>
+          <button class="btn btn-secondary" id="bk-remote-test">Verbindung testen</button>
+          <span id="bk-remote-test-result" style="margin-left:0.5rem;"></span>
+        </div>
+      </div>
+
+      <div style="margin-top:1.5rem;">
+        <button class="btn" id="bk-save-settings">Einstellungen speichern</button>
+      </div>
+
+      <!-- Vorhandene Backups -->
+      <div style="margin-top:2rem;">
+        <h2>Vorhandene Backups</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Dateiname</th><th>Größe</th><th>Erstellt</th><th>Verschlüsselt</th><th>Aktionen</th></tr></thead>
+            <tbody id="backup-rows"><tr><td colspan="5" class="empty">Lade Backups…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: Logs ═══ -->
+    <div class="tab-content" id="tab-logs">
+      <div class="controls" style="margin-bottom:1rem;">
+        <select id="filter-level">
+          <option value="">Alle Level</option>
+          <option value="DEBUG">DEBUG</option><option value="INFO">INFO</option>
+          <option value="WARN">WARN</option><option value="ERROR">ERROR</option>
+        </select>
+        <select id="filter-category"><option value="">Alle Kategorien</option></select>
+        <input type="text" id="filter-search" placeholder="Suche…" />
+        <label style="display:flex;align-items:center;gap:.4rem;white-space:nowrap;">
+          <span class="toggle"><input type="checkbox" id="auto-refresh" /><span class="slider"></span></span> Auto-Refresh
+        </label>
+        <span id="entry-count" style="white-space:nowrap;">0 Einträge</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zeitpunkt</th><th>Level</th><th>Kategorie</th><th>Benutzer</th><th>Nachricht</th><th>Details</th></tr></thead>
+          <tbody id="log-rows"><tr><td colspan="6" class="empty">Lade Logs…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="pagination" class="controls" style="justify-content:center;gap:.5rem;margin-top:1rem;"></div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=11"></script>
+  <script>
+    // ══════════════════════════════════════════
+    //  Tab switching
+    // ══════════════════════════════════════════
+    const tabs = document.querySelectorAll('.admin-tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const tabInited = {};
+
+    function switchTab(tabName) {
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+      tabContents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + tabName));
+      history.replaceState(null, '', '/admin/?tab=' + tabName);
+
+      // Lazy-init tabs on first visit
+      if (!tabInited[tabName]) {
+        tabInited[tabName] = true;
+        if (tabName === 'users') loadUsers();
+        if (tabName === 'cmdb') initCmdb();
+        if (tabName === 'backup') initBackup();
+        if (tabName === 'logs') loadLogs();
+      }
+    }
+
+    tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+    function e(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+    const dtOpts = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+    function fmtDate(v) { return v ? new Date(v).toLocaleDateString('de-DE', dtOpts) : '-'; }
+    function fmtTs(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })
+        + ' ' + d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+
+    // ══════════════════════════════════════════
+    //  TAB: Benutzer
+    // ══════════════════════════════════════════
+    let users = [];
+    let editId = null;
+    const roleLabels = { admin: 'Administrator', operator: 'Operator', readonly: 'Nur Lesen' };
+
+    async function loadUsers() {
+      const res = await fetch('/api/users.php');
+      if (res.status === 403) { document.getElementById('user-rows').innerHTML = '<tr><td colspan="8" class="empty">Kein Zugriff</td></tr>'; return; }
+      users = await res.json();
+      renderUsers();
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('user-rows');
+      if (!users.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">Keine Benutzer</td></tr>'; return; }
+      tbody.innerHTML = '';
+      users.forEach(u => {
+        const auth = [u.password_hash ? 'Lokal' : '', u.entra_oid ? 'Entra' : ''].filter(Boolean).join(', ') || '-';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${e(u.username)}</td><td>${e(u.display_name || '')}</td><td>${e(u.email || '')}</td>
+          <td>${e(roleLabels[u.role] || u.role)}</td><td>${e(auth)}</td>
+          <td>${u.is_active ? '<span class="state-on">Ja</span>' : '<span class="state-off">Nein</span>'}</td>
+          <td>${new Date(u.created_at).toLocaleDateString('de-DE')}</td>
+          <td>
+            <button class="btn-sm" onclick="editUser(${u.id})">Bearbeiten</button>
+            <button class="btn-sm ${u.is_active ? 'btn-danger' : 'btn-success'}" onclick="toggleActive(${u.id}, ${!u.is_active})">${u.is_active ? 'Deaktivieren' : 'Aktivieren'}</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openModal(title, user) {
+      editId = user ? user.id : null;
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('m-username').value = user?.username || ''; document.getElementById('m-username').disabled = !!user;
+      document.getElementById('m-displayname').value = user?.display_name || '';
+      document.getElementById('m-email').value = user?.email || '';
+      document.getElementById('m-role').value = user?.role || 'readonly';
+      document.getElementById('m-password').value = ''; document.getElementById('m-entra').value = user?.entra_oid || '';
+      document.getElementById('modal-error').style.display = 'none';
+      document.getElementById('user-modal').style.display = 'flex';
+    }
+
+    document.getElementById('add-user-btn').addEventListener('click', () => openModal('Benutzer anlegen', null));
+    document.getElementById('modal-cancel').addEventListener('click', () => { document.getElementById('user-modal').style.display = 'none'; });
+    document.getElementById('user-modal').addEventListener('click', (ev) => { if (ev.target.id === 'user-modal') ev.target.style.display = 'none'; });
+
+    window.editUser = function(id) { const u = users.find(x => x.id === id); if (u) openModal('Benutzer bearbeiten', u); };
+    window.toggleActive = async function(id, active) {
+      await fetch('/api/users.php', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, is_active: active }) });
+      loadUsers();
+    };
+
+    document.getElementById('modal-save').addEventListener('click', async () => {
+      const errEl = document.getElementById('modal-error');
+      const body = {
+        username: document.getElementById('m-username').value, display_name: document.getElementById('m-displayname').value,
+        email: document.getElementById('m-email').value, role: document.getElementById('m-role').value,
+        password: document.getElementById('m-password').value, entra_oid: document.getElementById('m-entra').value,
+      };
+      if (editId) body.id = editId;
+      const res = await fetch('/api/users.php', { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) { const d = await res.json(); errEl.textContent = d.error || 'Fehler'; errEl.style.display = 'block'; return; }
+      document.getElementById('user-modal').style.display = 'none';
+      loadUsers();
+    });
+
+    // ══════════════════════════════════════════
+    //  TAB: CMDB Browser
+    // ══════════════════════════════════════════
+    let cmdbPage = 1;
+    let cmdbTypes = []; // store full type list for parent/child lookup
+
+    function initCmdb() {
+      loadSchemas();
+      document.getElementById('cmdb-schema').addEventListener('change', loadObjectTypes);
+      document.getElementById('cmdb-type').addEventListener('change', () => { cmdbPage = 1; searchCmdb(); });
+      document.getElementById('cmdb-search-btn').addEventListener('click', () => { cmdbPage = 1; searchCmdb(); });
+      document.getElementById('cmdb-search').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { cmdbPage = 1; searchCmdb(); } });
+      document.getElementById('cmdb-detail-close').addEventListener('click', () => { document.getElementById('cmdb-detail').style.display = 'none'; });
+    }
+
+    async function loadSchemas() {
+      const res = await fetch('/api/jira-assets.php?action=schemas');
+      const data = await res.json();
+      const sel = document.getElementById('cmdb-schema');
+      (data.values || data).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = `${s.name} (${s.objectCount || 0})`;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function loadObjectTypes() {
+      const schemaId = document.getElementById('cmdb-schema').value;
+      const sel = document.getElementById('cmdb-type');
+      sel.innerHTML = '<option value="">Objekttyp wählen…</option>';
+      sel.disabled = !schemaId;
+      if (!schemaId) return;
+
+      try {
+        const res = await fetch('/api/jira-assets.php?action=types&schema=' + schemaId);
+        const data = await res.json();
+        if (data.error) { showToast('CMDB: ' + data.error, 'error'); return; }
+        cmdbTypes = Array.isArray(data) ? data : (data.values || []);
+        // Build parent lookup and sort hierarchically
+        const typeById = {};
+        cmdbTypes.forEach(t => { typeById[t.id] = t; });
+
+        function buildTree(parentId) {
+          const children = cmdbTypes.filter(t => String(t.parentObjectTypeId || '') === String(parentId || ''));
+          children.sort((a, b) => a.name.localeCompare(b.name));
+          let result = [];
+          children.forEach(c => {
+            result.push(c);
+            result = result.concat(buildTree(c.id));
+          });
+          return result;
+        }
+
+        // Root types have no parent or parent not in this schema
+        const rootTypes = cmdbTypes.filter(t => !t.parentObjectTypeId || !typeById[t.parentObjectTypeId]);
+        rootTypes.sort((a, b) => a.name.localeCompare(b.name));
+        let sorted = [];
+        rootTypes.forEach(r => {
+          sorted.push(r);
+          sorted = sorted.concat(buildTree(r.id));
+        });
+
+        function getDepth(t) {
+          let depth = 0, current = t;
+          while (current.parentObjectTypeId && typeById[current.parentObjectTypeId]) {
+            depth++; current = typeById[current.parentObjectTypeId];
+          }
+          return depth;
+        }
+
+        sorted.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.name;
+          const depth = getDepth(t);
+          const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(depth);
+          const prefix = depth > 0 ? '\u2514\u00A0' : '';
+          let label = indent + prefix + t.name;
+          if (t.objectCount) label += ` (${t.objectCount})`;
+          opt.textContent = label;
+          sel.appendChild(opt);
+        });
+        sel.disabled = false;
+      } catch (err) {
+        showToast('CMDB Objekttypen konnten nicht geladen werden', 'error');
+      }
+    }
+
+    function getDescendantNames(parentId) {
+      let names = [];
+      cmdbTypes.forEach(t => {
+        if (String(t.parentObjectTypeId) === String(parentId)) {
+          names.push(t.name);
+          names = names.concat(getDescendantNames(t.id));
+        }
+      });
+      return names;
+    }
+
+    async function searchCmdb() {
+      const typeName = document.getElementById('cmdb-type').value;
+      if (!typeName) return;
+
+      const schemaId = document.getElementById('cmdb-schema').value;
+      const selectedType = cmdbTypes.find(t => t.name === typeName);
+      const selectedId = selectedType ? (selectedType.id || selectedType.objectTypeId) : null;
+      const descendantNames = selectedId ? getDescendantNames(selectedId) : [];
+
+      let aql;
+      if (descendantNames.length > 0) {
+        const allNames = [typeName, ...descendantNames].map(n => `"${n}"`).join(', ');
+        aql = `objectType IN (${allNames}) AND objectSchemaId = ${schemaId}`;
+      } else {
+        aql = `objectType = "${typeName}" AND objectSchemaId = ${schemaId}`;
+      }
+      const extra = document.getElementById('cmdb-search').value.trim();
+      if (extra) aql += ` AND ${extra}`;
+
+      const params = new URLSearchParams({ action: 'search', aql, page: cmdbPage, perPage: 25 });
+      const res = await fetch('/api/jira-assets.php?' + params);
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'error'); return; }
+
+      const entries = data.values || data.objectEntries || [];
+      const isLast = data.isLast !== false && data.hasMoreResults !== true;
+      const shownSoFar = (cmdbPage - 1) * 25 + entries.length;
+      const totalLabel = isLast ? shownSoFar : `${shownSoFar}+`;
+      document.getElementById('cmdb-status').textContent = `${entries.length} Objekte (Seite ${cmdbPage}${isLast ? '' : ', weitere vorhanden'})`;
+
+      const tbody = document.getElementById('cmdb-rows');
+      if (!entries.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Keine Ergebnisse</td></tr>'; return; }
+
+      tbody.innerHTML = '';
+      entries.forEach(obj => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${e(obj.objectKey || '')}</strong></td>
+          <td>${e(obj.label || obj.name || '')}</td>
+          <td>${e(obj.objectType?.name || '')}</td>
+          <td>${fmtDate(obj.created)}</td><td>${fmtDate(obj.updated)}</td>
+          <td><button class="btn-sm" data-obj='${JSON.stringify(obj).replace(/'/g,"&#39;")}'>Details</button></td>`;
+        tr.querySelector('.btn-sm').addEventListener('click', function() { showCmdbDetail(JSON.parse(this.dataset.obj)); });
+        tbody.appendChild(tr);
+      });
+
+      // Pagination
+      const pagDiv = document.getElementById('cmdb-pagination');
+      pagDiv.innerHTML = '';
+      if (cmdbPage > 1) {
+        const prev = document.createElement('button'); prev.className = 'page-btn'; prev.textContent = '\u2190 Zurück';
+        prev.addEventListener('click', () => { cmdbPage--; searchCmdb(); }); pagDiv.appendChild(prev);
+      }
+      if (!isLast) {
+        const next = document.createElement('button'); next.className = 'page-btn'; next.textContent = 'Weiter \u2192';
+        next.addEventListener('click', () => { cmdbPage++; searchCmdb(); }); pagDiv.appendChild(next);
+      }
+    }
+
+    function showCmdbDetail(obj) {
+      document.getElementById('cmdb-detail-title').textContent = obj.label || obj.name || obj.objectKey;
+      const tbody = document.getElementById('cmdb-detail-rows');
+      tbody.innerHTML = '';
+
+      const addRow = (k, v) => { const tr = document.createElement('tr'); tr.innerHTML = `<td><strong>${e(k)}</strong></td><td>${e(v)}</td>`; tbody.appendChild(tr); };
+      addRow('Key', obj.objectKey || ''); addRow('Name', obj.label || obj.name || ''); addRow('Typ', obj.objectType?.name || '');
+
+      (obj.attributes || []).forEach(a => {
+        const name = a.objectTypeAttribute?.name || a.objectTypeAttributeId || '';
+        const vals = (a.objectAttributeValues || []).map(v => v.displayValue || v.value || '').join(', ');
+        if (name && vals) addRow(name, vals);
+      });
+
+      addRow('Erstellt', fmtDate(obj.created)); addRow('Geändert', fmtDate(obj.updated));
+      document.getElementById('cmdb-detail').style.display = '';
+    }
+
+    // ══════════════════════════════════════════
+    //  TAB: Backup
+    // ══════════════════════════════════════════
+    const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+    function initBackup() {
+      // Build day checkboxes
+      const daysDiv = document.getElementById('bk-schedule-days');
+      dayNames.forEach((name, i) => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:0.25rem;';
+        label.innerHTML = `<input type="checkbox" class="bk-day" value="${i}" checked /> ${name}`;
+        daysDiv.appendChild(label);
+      });
+
+      document.getElementById('backup-create-btn').addEventListener('click', createBackup);
+      document.getElementById('bk-save-settings').addEventListener('click', saveBackupSettings);
+      document.getElementById('bk-remote-test').addEventListener('click', testRemote);
+
+      loadBackupData();
+    }
+
+    async function loadBackupData() {
+      const res = await fetch('/api/backup.php');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Settings
+      const s = data.settings || {};
+      document.getElementById('bk-schedule-enabled').checked = !!s.schedule_enabled;
+      document.getElementById('bk-schedule-time').value = s.schedule_time || '02:00';
+      document.getElementById('bk-retention').value = s.retention_count || 7;
+      document.getElementById('bk-encrypt-enabled').checked = !!s.encryption_enabled;
+      document.getElementById('bk-remote-enabled').checked = !!s.remote_enabled;
+      document.getElementById('bk-remote-type').value = s.remote_type || 'sftp';
+      document.getElementById('bk-remote-host').value = s.remote_host || '';
+      document.getElementById('bk-remote-port').value = s.remote_port || 22;
+      document.getElementById('bk-remote-path').value = s.remote_path || '/backups';
+
+      const days = s.schedule_days || [0,1,2,3,4,5,6];
+      document.querySelectorAll('.bk-day').forEach(cb => { cb.checked = days.includes(parseInt(cb.value)); });
+
+      // Backups list
+      renderBackups(data.backups || []);
+    }
+
+    function renderBackups(backups) {
+      const tbody = document.getElementById('backup-rows');
+      if (!backups.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Keine Backups vorhanden</td></tr>'; return; }
+
+      tbody.innerHTML = '';
+      backups.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${e(b.filename)}</td>
+          <td>${formatSize(b.size)}</td>
+          <td>${fmtDate(b.created_at)}</td>
+          <td>${b.encrypted ? '<span class="state-on">Ja</span>' : '<span class="state-off">Nein</span>'}</td>
+          <td style="display:flex;gap:0.4rem;">
+            <a href="/api/backup.php?action=download&file=${encodeURIComponent(b.filename)}" class="btn-sm">Download</a>
+            <button class="btn-sm btn-danger" onclick="deleteBackup('${e(b.filename)}')">Löschen</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    async function createBackup() {
+      const btn = document.getElementById('backup-create-btn');
+      const status = document.getElementById('backup-create-status');
+      btn.disabled = true; btn.textContent = 'Erstelle Backup…';
+      status.innerHTML = '';
+      try {
+        const res = await fetch('/api/backup.php', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create' }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Fehler');
+        showToast(`Backup erstellt: ${data.filename} (${formatSize(data.size)})`, 'success');
+        loadBackupData();
+      } catch (err) { showToast(err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'Backup jetzt erstellen'; }
+    }
+
+    async function saveBackupSettings() {
+      const days = []; document.querySelectorAll('.bk-day:checked').forEach(cb => days.push(parseInt(cb.value)));
+      const settings = {
+        schedule_enabled: document.getElementById('bk-schedule-enabled').checked,
+        schedule_time: document.getElementById('bk-schedule-time').value,
+        schedule_days: days,
+        retention_count: parseInt(document.getElementById('bk-retention').value),
+        encryption_enabled: document.getElementById('bk-encrypt-enabled').checked,
+        remote_enabled: document.getElementById('bk-remote-enabled').checked,
+        remote_type: document.getElementById('bk-remote-type').value,
+        remote_host: document.getElementById('bk-remote-host').value,
+        remote_port: parseInt(document.getElementById('bk-remote-port').value),
+        remote_path: document.getElementById('bk-remote-path').value,
+      };
+      const res = await fetch('/api/backup.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_settings', settings }),
+      });
+      showToast(res.ok ? 'Einstellungen gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
+    }
+
+    async function testRemote() {
+      const btn = document.getElementById('bk-remote-test');
+      const result = document.getElementById('bk-remote-test-result');
+      btn.disabled = true; result.textContent = 'Teste…';
+      try {
+        const res = await fetch('/api/backup.php', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'test_remote' }),
+        });
+        const data = await res.json();
+        result.textContent = res.ok ? 'Verbindung OK' : (data.error || 'Fehler');
+        result.style.color = res.ok ? 'var(--success)' : 'var(--danger)';
+      } catch (err) { result.textContent = err.message; result.style.color = 'var(--danger)'; }
+      finally { btn.disabled = false; }
+    }
+
+    window.deleteBackup = async function(filename) {
+      if (!confirm(`Backup "${filename}" wirklich löschen?`)) return;
+      const res = await fetch('/api/backup.php', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename }),
+      });
+      if (res.ok) { showToast('Backup gelöscht', 'success'); loadBackupData(); }
+      else { const d = await res.json(); showToast(d.error || 'Fehler', 'error'); }
+    };
+
+    // ══════════════════════════════════════════
+    //  TAB: Logs
+    // ══════════════════════════════════════════
+    let logPage = 1;
+    const logPerPage = 100;
+    let refreshTimer = null;
+
+    function levelClass(lvl) {
+      switch (lvl) { case 'DEBUG': return 'text-muted'; case 'WARN': return 'text-warning'; case 'ERROR': return 'text-danger'; default: return ''; }
+    }
+
+    async function loadLogs() {
+      const params = new URLSearchParams();
+      const lv = document.getElementById('filter-level').value;
+      const cat = document.getElementById('filter-category').value;
+      const q = document.getElementById('filter-search').value;
+      if (lv) params.set('level', lv); if (cat) params.set('category', cat); if (q) params.set('search', q);
+      params.set('page', logPage); params.set('perPage', logPerPage);
+
+      const res = await fetch('/api/logs.php?' + params);
+      if (res.status === 403) { document.getElementById('log-rows').innerHTML = '<tr><td colspan="6" class="empty">Kein Zugriff</td></tr>'; return; }
+      const data = await res.json();
+      document.getElementById('entry-count').textContent = data.total + ' Einträge';
+
+      // Categories
+      const catEl = document.getElementById('filter-category');
+      const curCat = catEl.value;
+      catEl.innerHTML = '<option value="">Alle Kategorien</option>';
+      (data.categories || []).forEach(c => {
+        const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
+        if (c === curCat) opt.selected = true; catEl.appendChild(opt);
+      });
+
+      const tbody = document.getElementById('log-rows');
+      if (!data.logs.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Keine Einträge</td></tr>'; return; }
+      tbody.innerHTML = '';
+      data.logs.forEach(l => {
+        const ctx = l.context ? (typeof l.context === 'string' ? l.context : JSON.stringify(l.context, null, 2)) : '';
+        const short = ctx.length > 50 ? ctx.substring(0, 50) + '…' : ctx;
+        const detailHtml = ctx
+          ? `<code class="log-detail" style="cursor:pointer" data-full="${e(ctx)}" data-collapsed="true">${e(short)}</code>`
+          : '<span class="text-muted">–</span>';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${fmtTs(l.created_at)}</td><td class="${levelClass(l.level)}"><strong>${e(l.level)}</strong></td>
+          <td>${e(l.category)}</td><td>${e(l.username || '–')}</td><td>${e(l.message)}</td><td>${detailHtml}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      // Pagination
+      const pagDiv = document.getElementById('pagination');
+      const pages = Math.max(1, Math.ceil(data.total / logPerPage));
+      pagDiv.innerHTML = '';
+      if (pages > 1) {
+        for (let p = 1; p <= pages; p++) {
+          const btn = document.createElement('button'); btn.className = 'page-btn' + (p === logPage ? ' active' : '');
+          btn.textContent = p; btn.addEventListener('click', () => { logPage = p; loadLogs(); }); pagDiv.appendChild(btn);
+        }
+      }
+    }
+
+    document.getElementById('filter-level').addEventListener('change', () => { logPage = 1; loadLogs(); });
+    document.getElementById('filter-category').addEventListener('change', () => { logPage = 1; loadLogs(); });
+    let logSearchTimeout;
+    document.getElementById('filter-search').addEventListener('input', () => { clearTimeout(logSearchTimeout); logSearchTimeout = setTimeout(() => { logPage = 1; loadLogs(); }, 400); });
+    document.getElementById('auto-refresh').addEventListener('change', () => {
+      if (document.getElementById('auto-refresh').checked) refreshTimer = setInterval(loadLogs, 10000);
+      else { clearInterval(refreshTimer); refreshTimer = null; }
+    });
+
+    // Expand/collapse log details
+    document.addEventListener('click', (ev) => {
+      const el = ev.target.closest('.log-detail');
+      if (!el) return;
+      if (el.dataset.collapsed === 'true') { el.textContent = el.dataset.full; el.style.whiteSpace = 'pre-wrap'; el.style.wordBreak = 'break-all'; el.dataset.collapsed = 'false'; }
+      else { el.textContent = el.dataset.full.substring(0, 50) + '…'; el.style.whiteSpace = ''; el.style.wordBreak = ''; el.dataset.collapsed = 'true'; }
+    });
+
+    // ══════════════════════════════════════════
+    //  Init: select tab from URL
+    // ══════════════════════════════════════════
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab && document.querySelector(`.admin-tab[data-tab="${urlTab}"]`)) {
+      switchTab(urlTab);
+    } else {
+      tabInited['users'] = true;
+      loadUsers();
+    }
+  </script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 </head>
 <body class="login-body">
   <div class="login-card">
-    <h1 class="login-brand">Accounting</h1>
+    <h1 class="login-brand">TST Portal</h1>
     <p class="login-subtitle">Anmeldung</p>
 
     <div id="error-msg" class="login-error" style="display:none;"></div>
@@ -40,7 +40,7 @@
 
   <script>
     // Check if already logged in
-    fetch('/api/auth/me.php').then(r => { if (r.ok) window.location.href = '/'; });
+    fetch('/api/auth/me.php').then(r => { if (r.ok) window.location.href = '/it/'; });
 
     // Show error from URL (Entra ID callback)
     const urlError = new URLSearchParams(window.location.search).get('error');
@@ -69,7 +69,7 @@
         });
 
         if (res.ok) {
-          window.location.href = '/';
+          window.location.href = '/it/';
           return;
         }
 

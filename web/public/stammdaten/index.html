@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stammdaten – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=11">
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Stammdaten</h1>
+      <div class="controls">
+        <select id="stammdaten-select">
+          <option value="">Bitte wählen…</option>
+          <option value="customers">Kundenkürzel</option>
+          <option value="pricing">Preisklassen &amp; Punktefaktoren</option>
+          <option value="configurator">Kalkulator</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="stammdaten-content"></div>
+  </div>
+
+  <script src="/app.js?v=11"></script>
+  <script>
+    // ── Kundenkürzel ──
+    let customers = [];
+
+    function renderCustomersModule(container) {
+      container.innerHTML = `
+        <div class="page-header" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Kundenkürzel</h2>
+          <div class="controls">
+            <input type="text" id="cust-search" placeholder="Suchen…" />
+            <span id="cust-count" class="count"></span>
+            <button class="btn" id="cust-sync-btn" title="Kundenkürzel aus Jira Assets CMDB synchronisieren">CMDB Sync</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Code</th><th>Kunde</th><th>Status</th></tr></thead>
+            <tbody id="cust-rows"></tbody>
+          </table>
+        </div>
+      `;
+
+      loadCustomers();
+
+      document.getElementById('cust-search').addEventListener('input', () => renderCustomerRows());
+      document.getElementById('cust-sync-btn').addEventListener('click', syncCmdb);
+    }
+
+    async function loadCustomers() {
+      const res = await fetch('/api/customers.php');
+      customers = await res.json();
+      renderCustomerRows();
+    }
+
+    function renderCustomerRows() {
+      const query = document.getElementById('cust-search').value.toLowerCase().trim();
+      let filtered = customers;
+      if (query) {
+        filtered = customers.filter(c =>
+          c.code.toLowerCase().includes(query) || c.name.toLowerCase().includes(query)
+        );
+      }
+
+      document.getElementById('cust-count').textContent = `${filtered.length} Kürzel`;
+      const tbody = document.getElementById('cust-rows');
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty">Keine Kürzel gefunden.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      filtered.forEach(c => {
+        const tr = document.createElement('tr');
+        if (!c.is_active) tr.style.opacity = '0.5';
+        tr.innerHTML = `
+          <td><strong>${esc(c.code)}</strong></td>
+          <td>${esc(c.name)}</td>
+          <td>${c.is_active ? '<span class="state-on">Aktiv</span>' : '<span class="state-off">Inaktiv</span>'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function syncCmdb() {
+      const btn = document.getElementById('cust-sync-btn');
+      btn.disabled = true;
+      btn.textContent = 'Synchronisiere…';
+      try {
+        const res = await fetch('/api/customers.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync_cmdb' }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Fehler');
+        showToast(`${data.created} neu, ${data.updated} aktualisiert, ${data.deactivated} deaktiviert`, 'success');
+        loadCustomers();
+      } catch (e) {
+        showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'CMDB Sync';
+      }
+    }
+
+    // ── Preisklassen & Punktefaktoren ──
+    let pricingData = null;
+
+    function renderPricingModule(container) {
+      container.innerHTML = `
+        <div class="settings-grid">
+          <div class="settings-section">
+            <h2>Punktefaktoren</h2>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+              Punkte pro Einheit. Gesamtpunkte = (vCPU &times; Faktor) + (RAM GB &times; Faktor) + (Storage GB &times; Faktor)
+            </p>
+            <div id="factors-container"></div>
+            <button class="btn" id="save-factors-btn" style="margin-top:1rem;">Faktoren speichern</button>
+          </div>
+          <div class="settings-section" style="grid-column: span 2;">
+            <h2>Preisklassen</h2>
+            <div class="table-wrap" style="max-height:600px;overflow-y:auto;">
+              <table>
+                <thead><tr><th>Klasse</th><th>Bis Punkte</th><th>Preis (EUR)</th></tr></thead>
+                <tbody id="tiers-rows"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem;">
+              <button class="btn" id="save-tiers-btn">Preisklassen speichern</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      loadPricing();
+
+      document.getElementById('save-factors-btn').addEventListener('click', saveFactors);
+      document.getElementById('save-tiers-btn').addEventListener('click', saveTiers);
+    }
+
+    async function loadPricing() {
+      const res = await fetch('/api/pricing.php');
+      pricingData = await res.json();
+      renderFactors();
+      renderTiers();
+    }
+
+    function renderFactors() {
+      const labels = { vcpu: 'vCPU', vram_gb: 'RAM (GB)', storage_gb: 'Storage (GB)' };
+      const c = document.getElementById('factors-container');
+      c.innerHTML = '';
+      pricingData.factors.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        div.innerHTML = `
+          <label>${labels[f.resource] || f.resource} (pro ${f.unit})</label>
+          <input type="number" step="0.0001" data-resource="${f.resource}" value="${f.points_per_unit}" />
+        `;
+        c.appendChild(div);
+      });
+    }
+
+    function renderTiers() {
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      const tbody = document.getElementById('tiers-rows');
+      tbody.innerHTML = '';
+      pricingData.tiers.forEach(t => {
+        const tr = document.createElement('tr');
+        if (isAdmin) {
+          tr.innerHTML = `
+            <td><strong>${t.class_name}</strong></td>
+            <td><input type="number" class="tier-points" data-id="${t.id}" value="${t.max_points}" step="1" style="width:80px;" /></td>
+            <td><input type="number" class="tier-price" data-id="${t.id}" value="${t.price}" step="0.01" style="width:110px;" /></td>
+          `;
+        } else {
+          tr.innerHTML = `
+            <td><strong>${t.class_name}</strong></td>
+            <td>${Number(t.max_points).toLocaleString('de-DE')}</td>
+            <td>${Number(t.price).toLocaleString('de-DE', {minimumFractionDigits:2})} \u20AC</td>
+          `;
+        }
+        tbody.appendChild(tr);
+      });
+      document.getElementById('save-tiers-btn').style.display = isAdmin ? '' : 'none';
+    }
+
+    async function saveFactors() {
+      const factors = [];
+      document.querySelectorAll('#factors-container input').forEach(inp => {
+        factors.push({ resource: inp.dataset.resource, points_per_unit: parseFloat(inp.value) });
+      });
+      const res = await fetch('/api/pricing.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factors }),
+      });
+      showToast(res.ok ? 'Faktoren gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
+    }
+
+    async function saveTiers() {
+      const tiers = [];
+      const pointInputs = document.querySelectorAll('.tier-points');
+      const priceInputs = document.querySelectorAll('.tier-price');
+      pointInputs.forEach((inp, i) => {
+        tiers.push({
+          id: parseInt(inp.dataset.id),
+          max_points: parseFloat(inp.value),
+          price: parseFloat(priceInputs[i].value),
+        });
+      });
+      const res = await fetch('/api/pricing.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tiers }),
+      });
+      showToast(res.ok ? 'Preisklassen gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
+    }
+
+    // ── Kalkulator-Einstellungen ──
+    let cfgData = null;
+
+    function renderConfiguratorModule(container) {
+      container.innerHTML = `
+        <div class="page-header" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Kalkulator-Einstellungen</h2>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.5rem;">
+          Diese Werte werden im Kundenportal-Konfigurator als Standardpreise verwendet.
+        </p>
+        <div class="settings-grid">
+          <div class="settings-section">
+            <h3>Allgemein</h3>
+            <div class="form-group">
+              <label>Marge (%)</label>
+              <input type="number" id="cfg-margin" step="0.5" min="0" max="100" />
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;">Wird auf alle Positionen aufgeschlagen</div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>Netzwerk</h3>
+            <div class="form-group"><label>Netzwerk-Preis pro m² (EUR/Monat)</label><input type="number" id="cfg-network" step="0.01" min="0" /></div>
+            <div class="form-group"><label>Preis pro Access Point (EUR, einmalig)</label><input type="number" id="cfg-ap" step="0.01" min="0" /></div>
+            <div class="form-group"><label>Preis pro Switch (EUR/Monat)</label><input type="number" id="cfg-switch" step="0.01" min="0" /></div>
+          </div>
+          <div class="settings-section">
+            <h3>Arbeitsplätze</h3>
+            <div class="form-group"><label>Admin Workplace (EUR/Monat)</label><input type="number" id="cfg-wp-admin" step="0.01" min="0" /></div>
+            <div class="form-group"><label>Operativer Workplace (EUR/Monat)</label><input type="number" id="cfg-wp-operative" step="0.01" min="0" /></div>
+            <div class="form-group"><label>Scanner Workplace (EUR/Monat)</label><input type="number" id="cfg-wp-scanner" step="0.01" min="0" /></div>
+          </div>
+          <div class="settings-section">
+            <h3>Lizenzen</h3>
+            <div class="form-group"><label>M365 Lizenz (EUR/Monat)</label><input type="number" id="cfg-lic-m365" step="0.01" min="0" /></div>
+            <div class="form-group"><label>ERP Lizenz (EUR/Monat)</label><input type="number" id="cfg-lic-erp" step="0.01" min="0" /></div>
+          </div>
+        </div>
+        <button class="btn" id="cfg-save-btn" style="margin-top:1rem;">Einstellungen speichern</button>
+      `;
+
+      loadConfiguratorSettings();
+      document.getElementById('cfg-save-btn').addEventListener('click', saveConfiguratorSettings);
+    }
+
+    async function loadConfiguratorSettings() {
+      const res = await fetch('/api/configurator.php');
+      cfgData = await res.json();
+      document.getElementById('cfg-margin').value = cfgData.margin_percent ?? 15;
+      document.getElementById('cfg-network').value = cfgData.network_price_per_sqm ?? 10;
+      document.getElementById('cfg-ap').value = cfgData.ap_price ?? 600;
+      document.getElementById('cfg-switch').value = cfgData.switch_price_monthly ?? 150;
+      document.getElementById('cfg-wp-admin').value = cfgData.wp_admin_price_monthly ?? 120;
+      document.getElementById('cfg-wp-operative').value = cfgData.wp_operative_price_monthly ?? 80;
+      document.getElementById('cfg-wp-scanner').value = cfgData.wp_scanner_price_monthly ?? 45;
+      document.getElementById('cfg-lic-m365').value = cfgData.lic_m365_price_monthly ?? 22;
+      document.getElementById('cfg-lic-erp').value = cfgData.lic_erp_price_monthly ?? 85;
+    }
+
+    async function saveConfiguratorSettings() {
+      const body = {
+        margin_percent:             parseFloat(document.getElementById('cfg-margin').value),
+        network_price_per_sqm:      parseFloat(document.getElementById('cfg-network').value),
+        ap_price:                   parseFloat(document.getElementById('cfg-ap').value),
+        switch_price_monthly:       parseFloat(document.getElementById('cfg-switch').value),
+        wp_admin_price_monthly:     parseFloat(document.getElementById('cfg-wp-admin').value),
+        wp_operative_price_monthly: parseFloat(document.getElementById('cfg-wp-operative').value),
+        wp_scanner_price_monthly:   parseFloat(document.getElementById('cfg-wp-scanner').value),
+        lic_m365_price_monthly:     parseFloat(document.getElementById('cfg-lic-m365').value),
+        lic_erp_price_monthly:      parseFloat(document.getElementById('cfg-lic-erp').value),
+      };
+      const res = await fetch('/api/configurator.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      showToast(res.ok ? 'Kalkulator-Einstellungen gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
+    }
+
+    // ── Module-Dispatcher ──
+    const modules = {
+      customers: renderCustomersModule,
+      pricing: renderPricingModule,
+      configurator: renderConfiguratorModule,
+    };
+
+    const select = document.getElementById('stammdaten-select');
+
+    select.addEventListener('change', () => {
+      const container = document.getElementById('stammdaten-content');
+      const mod = modules[select.value];
+      if (mod) {
+        mod(container);
+        // Update URL without reload
+        history.replaceState(null, '', '/stammdaten/?tab=' + select.value);
+      } else {
+        container.innerHTML = '<p style="color:var(--text-muted);padding:2rem 0;">Bitte einen Bereich auswählen.</p>';
+        history.replaceState(null, '', '/stammdaten/');
+      }
+    });
+
+    // Auto-select from URL param
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab && modules[urlTab]) {
+      select.value = urlTab;
+      select.dispatchEvent(new Event('change'));
+    }
+  </script>
+</body>
+</html>

@@ -33,6 +33,8 @@ services:
       - "80"
     depends_on:
       - postgres
+    volumes:
+      - accounting-backups:/var/www/backups
     secrets:
       - pg_password
       - vault_key
@@ -70,4 +72,5 @@ secrets:
 
 volumes:
   accounting-pgdata:
+  accounting-backups:
   certbot-webroot:

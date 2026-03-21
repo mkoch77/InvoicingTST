@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kundenportal</title>
+  <link rel="stylesheet" href="/style.css?v=11">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: var(--bg); }
+    .portal { text-align: center; max-width: 800px; width: 100%; padding: 2rem; }
+    .portal h1 { color: var(--text); font-size: 2rem; margin-bottom: 0.5rem; }
+    .portal .subtitle { color: var(--text-muted); margin-bottom: 3rem; font-size: 1.05rem; }
+    .portal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+    .portal-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 2rem 1.5rem; text-decoration: none; color: var(--text);
+      transition: border-color 0.2s, transform 0.15s; text-align: left;
+    }
+    .portal-card:hover { border-color: var(--success); transform: translateY(-2px); }
+    .portal-card .card-icon { font-size: 2rem; filter: grayscale(1) brightness(1.5); margin-bottom: 0.75rem; }
+    .portal-card h2 { font-size: 1.15rem; margin-bottom: 0.4rem; }
+    .portal-card p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin: 0; }
+    .portal-card.disabled { opacity: 0.4; pointer-events: none; }
+    .portal-card .badge { display: inline-block; font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 9999px; background: var(--bg-input); color: var(--text-muted); margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="portal">
+    <h1>Kundenportal</h1>
+    <p class="subtitle">Willkommen im TST Kundenportal</p>
+    <div class="portal-grid">
+
+      <a href="/customer/configurator.html" class="portal-card">
+        <div class="card-icon">&#x2699;</div>
+        <h2>IT Konfigurator</h2>
+        <p>Kalkulation für Kundengeschäft — Netzwerk, Arbeitsplätze, Lizenzen.</p>
+      </a>
+
+      <a href="#" class="portal-card disabled">
+        <div class="card-icon">&#x1F4C4;</div>
+        <h2>Rechnungsportal</h2>
+        <p>Rechnungen einsehen und herunterladen.</p>
+        <span class="badge">Demnächst</span>
+      </a>
+
+      <a href="#" class="portal-card disabled">
+        <div class="card-icon">&#x1F527;</div>
+        <h2>Self-Service</h2>
+        <p>Bestellungen, Änderungen und Support-Anfragen.</p>
+        <span class="badge">Demnächst</span>
+      </a>
+
+    </div>
+  </div>
+</body>
+</html>
