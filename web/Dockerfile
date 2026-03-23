@@ -36,6 +36,7 @@ RUN chown -R www-data:www-data /var/www \
 
 # Cron-Jobs
 RUN echo '0 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-customers.php >> /var/log/cron-sync.log 2>&1' > /etc/cron.d/cmdb-sync \
+    && echo '30 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-companies.php >> /var/log/cron-sync.log 2>&1' >> /etc/cron.d/cmdb-sync \
     && echo '* * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/backup.php >> /var/log/cron-backup.log 2>&1' > /etc/cron.d/backup \
     && chmod 644 /etc/cron.d/cmdb-sync /etc/cron.d/backup
 

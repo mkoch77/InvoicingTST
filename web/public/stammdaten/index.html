@@ -15,6 +15,7 @@
         <select id="stammdaten-select">
           <option value="">Bitte wählen…</option>
           <option value="customers">Kundenkürzel</option>
+          <option value="company">Firmenstruktur</option>
           <option value="pricing">Preisklassen &amp; Punktefaktoren</option>
           <option value="configurator">Kalkulator</option>
         </select>
@@ -26,6 +27,8 @@
 
   <script src="/app.js?v=11"></script>
   <script>
+    function e(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
     // ── Kundenkürzel ──
     let customers = [];
 
@@ -35,6 +38,9 @@
           <h2 style="margin:0;">Kundenkürzel</h2>
           <div class="controls">
             <input type="text" id="cust-search" placeholder="Suchen…" />
+            <label style="display:flex;align-items:center;gap:.4rem;white-space:nowrap;">
+              <span class="toggle"><input type="checkbox" id="cust-active-only" checked /><span class="slider"></span></span> Nur aktive
+            </label>
             <span id="cust-count" class="count"></span>
             <button class="btn" id="cust-sync-btn" title="Kundenkürzel aus Jira Assets CMDB synchronisieren">CMDB Sync</button>
           </div>
@@ -50,6 +56,7 @@
       loadCustomers();
 
       document.getElementById('cust-search').addEventListener('input', () => renderCustomerRows());
+      document.getElementById('cust-active-only').addEventListener('change', () => renderCustomerRows());
       document.getElementById('cust-sync-btn').addEventListener('click', syncCmdb);
     }
 
@@ -61,9 +68,13 @@
 
     function renderCustomerRows() {
       const query = document.getElementById('cust-search').value.toLowerCase().trim();
+      const activeOnly = document.getElementById('cust-active-only')?.checked ?? true;
       let filtered = customers;
+      if (activeOnly) {
+        filtered = filtered.filter(c => c.is_active);
+      }
       if (query) {
-        filtered = customers.filter(c =>
+        filtered = filtered.filter(c =>
           c.code.toLowerCase().includes(query) || c.name.toLowerCase().includes(query)
         );
       }
@@ -303,9 +314,135 @@
       showToast(res.ok ? 'Kalkulator-Einstellungen gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
     }
 
+    // ── Firmenstruktur ──
+    let companyData = [];
+
+    function renderCompanyModule(container) {
+      container.innerHTML = `
+        <div class="page-header" style="margin-bottom:1rem;">
+          <h2 style="margin:0;">Firmenstruktur</h2>
+          <div class="controls">
+            <input type="text" id="company-search" placeholder="Firma suchen…" />
+            <label style="display:flex;align-items:center;gap:.4rem;white-space:nowrap;">
+              <span class="toggle"><input type="checkbox" id="company-active-only" checked /><span class="slider"></span></span> Nur aktive
+            </label>
+            <button class="btn" id="company-sync-btn">CMDB Sync</button>
+            <span id="company-count" class="count"></span>
+          </div>
+        </div>
+        <div id="company-tree"></div>
+      `;
+
+      document.getElementById('company-sync-btn').addEventListener('click', syncCompanyData);
+      document.getElementById('company-search').addEventListener('input', renderCompanyTree);
+      document.getElementById('company-active-only').addEventListener('change', renderCompanyTree);
+      loadCompanyData();
+    }
+
+    async function loadCompanyData() {
+      try {
+        const res = await fetch('/api/company-structure.php');
+        companyData = await res.json();
+        if (companyData.error) { showToast(companyData.error, 'error'); return; }
+        renderCompanyTree();
+      } catch (err) { console.error('Company load error:', err); showToast('Fehler beim Laden: ' + err.message, 'error'); }
+    }
+
+    function renderCompanyTree() {
+      const search = (document.getElementById('company-search')?.value || '').toLowerCase();
+      const activeOnly = document.getElementById('company-active-only')?.checked ?? true;
+      const tree = document.getElementById('company-tree');
+      tree.innerHTML = '';
+
+      let visibleCompanies = 0;
+
+      companyData.forEach(company => {
+        if (activeOnly && company.status !== 'Active') return;
+        let costCenters = company.cost_centers || [];
+        if (activeOnly) costCenters = costCenters.filter(cc => cc.status === 'Active');
+        const matchCompany = company.name.toLowerCase().includes(search);
+        const matchingCC = costCenters.filter(cc =>
+          cc.name.toLowerCase().includes(search) ||
+          cc.cost_bearer.toLowerCase().includes(search) ||
+          cc.address.toLowerCase().includes(search)
+        );
+
+        if (!matchCompany && matchingCC.length === 0) return;
+        visibleCompanies++;
+
+        const section = document.createElement('div');
+        section.className = 'settings-section';
+        section.style.marginBottom = '1rem';
+
+        const statusDot = company.status === 'Active'
+          ? '<span style="color:#4caf50;font-size:1em;">&#9679;</span>'
+          : '<span style="color:#f44336;font-size:1em;">&#9679;</span>';
+
+        const ccToShow = matchCompany ? costCenters : matchingCC;
+
+        let ccHtml = '';
+        if (ccToShow.length > 0) {
+          ccHtml = `<table style="width:100%;margin-top:.75rem;">
+            <thead><tr>
+              <th style="width:100px;">Kostenstelle</th>
+              <th>Kostenstellenname</th>
+              <th>Adresse</th>
+              <th>Kunde</th>
+              <th style="width:80px;">Status</th>
+            </tr></thead><tbody>` +
+            ccToShow.map(cc => {
+              const ccDot = cc.status === 'Active'
+                ? '<span style="color:#4caf50;">&#9679;</span> Active'
+                : `<span style="color:#f44336;">&#9679;</span> ${e(cc.status || 'Unbekannt')}`;
+              return `<tr>
+                <td><strong>${e(cc.name)}</strong></td>
+                <td>${e(cc.cost_bearer)}</td>
+                <td>${e(cc.address)}</td>
+                <td>${e(cc.customer || '')}</td>
+                <td>${ccDot}</td>
+              </tr>`;
+            }).join('') +
+            `</tbody></table>`;
+        } else {
+          ccHtml = '<p style="color:var(--text-muted);margin-top:.5rem;">Keine Kostenstellen zugeordnet</p>';
+        }
+
+        section.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" class="company-header">
+            <h3 style="margin:0;">${statusDot} ${e(company.name)}</h3>
+            <span style="color:var(--text-muted);">${company.location || ''} &middot; ${ccToShow.length} Kostenstelle${ccToShow.length !== 1 ? 'n' : ''}</span>
+          </div>
+          <div class="company-details" style="display:none;">${ccHtml}</div>
+        `;
+
+        section.querySelector('.company-header').addEventListener('click', function() {
+          const details = this.nextElementSibling;
+          details.style.display = details.style.display === 'none' ? '' : 'none';
+        });
+
+        tree.appendChild(section);
+      });
+
+      const countEl = document.getElementById('company-count');
+      if (countEl) countEl.textContent = visibleCompanies + ' Firmen';
+    }
+
+    async function syncCompanyData() {
+      const btn = document.getElementById('company-sync-btn');
+      btn.disabled = true; btn.textContent = 'Synchronisiere…';
+      try {
+        const res = await fetch('/api/company-structure.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sync' }) });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); }
+        else { showToast(data.message || 'Sync erfolgreich', 'success'); await loadCompanyData(); }
+      } catch (err) { showToast('Sync fehlgeschlagen', 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'CMDB Sync'; }
+    }
+
     // ── Module-Dispatcher ──
     const modules = {
       customers: renderCustomersModule,
+      company: renderCompanyModule,
       pricing: renderPricingModule,
       configurator: renderConfiguratorModule,
     };

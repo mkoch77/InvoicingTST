@@ -71,10 +71,8 @@
 
     // Vordefinierte Secrets die immer angezeigt werden
     const requiredSecrets = [
-      { key_name: 'jira_client_id',              description: 'OAuth App Client ID (developer.atlassian.com)' },
-      { key_name: 'jira_client_secret',          description: 'OAuth App Client Secret' },
+      { key_name: 'jira_api_token',              description: 'Service Account Scoped API-Token (Bearer)' },
       { key_name: 'jira_workspace_id',           description: 'Assets Workspace-ID (GET /rest/servicedeskapi/assets/workspace)' },
-      { key_name: 'jira_refresh_token',          description: 'OAuth Refresh Token (einmalig via exchange-token.sh)' },
       { key_name: 'backup_encryption_key',       description: 'AES-256 Schlüssel für Backup-Verschlüsselung' },
       { key_name: 'backup_remote_credentials',   description: 'Remote-Backup Zugangsdaten (JSON: {"user":"...","password":"..."})' },
     ];

@@ -19,9 +19,17 @@ try {
     $server = 0;
     $templates = 0;
 
-    // Pricing aggregation: count per class + total price
+    // Pricing aggregation: count per class + total price (only IaaS servers)
     $classCounts = [];
     $totalPrice = 0.0;
+
+    // Load IaaS server hostnames from service mapping
+    $pdo = getDb();
+    $iaasHostnames = [];
+    $rows = $pdo->query("SELECT hostname FROM server_service_mapping WHERE it_service LIKE '%Iaas%Infrastructure%'")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($rows as $h) {
+        $iaasHostnames[strtoupper($h)] = true;
+    }
 
     foreach ($vms as &$vm) {
         $hostname = strtoupper($vm['hostname'] ?? '');
@@ -39,9 +47,10 @@ try {
             $server++;
         }
 
-        // Enrich with pricing
+        // Enrich with pricing — only count IaaS servers for billing
         enrichVmWithPricing($vm);
-        if (!empty($vm['pricing_class']) && $vm['price'] > 0) {
+        $isIaas = isset($iaasHostnames[$hostname]);
+        if ($isIaas && !empty($vm['pricing_class']) && $vm['price'] > 0) {
             $cls = $vm['pricing_class'];
             if (!isset($classCounts[$cls])) {
                 $classCounts[$cls] = ['count' => 0, 'price' => (float) $vm['price']];

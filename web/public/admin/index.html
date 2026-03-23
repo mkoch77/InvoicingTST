@@ -72,7 +72,11 @@
       <div class="controls" style="margin-bottom:1rem;flex-wrap:wrap;">
         <select id="cmdb-schema"><option value="">Schema wählen…</option></select>
         <select id="cmdb-type" disabled><option value="">Objekttyp wählen…</option></select>
-        <input type="text" id="cmdb-search" placeholder="AQL Suche…" style="flex:1;min-width:200px;" />
+        <input type="text" id="cmdb-name-search" placeholder="Name suchen…" style="min-width:180px;" />
+        <input type="text" id="cmdb-search" placeholder="AQL (erweitert)…" style="flex:1;min-width:150px;" />
+        <label style="display:flex;align-items:center;gap:.4rem;white-space:nowrap;">
+          <span class="toggle"><input type="checkbox" id="cmdb-active-only" checked /><span class="slider"></span></span> Nur aktive
+        </label>
         <button class="btn" id="cmdb-search-btn">Suchen</button>
         <span id="cmdb-status" class="count"></span>
       </div>
@@ -327,6 +331,7 @@
     //  TAB: CMDB Browser
     // ══════════════════════════════════════════
     let cmdbPage = 1;
+    let cmdbAttrMap = {};
     let cmdbTypes = []; // store full type list for parent/child lookup
 
     function initCmdb() {
@@ -335,6 +340,8 @@
       document.getElementById('cmdb-type').addEventListener('change', () => { cmdbPage = 1; searchCmdb(); });
       document.getElementById('cmdb-search-btn').addEventListener('click', () => { cmdbPage = 1; searchCmdb(); });
       document.getElementById('cmdb-search').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { cmdbPage = 1; searchCmdb(); } });
+      document.getElementById('cmdb-name-search').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { cmdbPage = 1; searchCmdb(); } });
+      document.getElementById('cmdb-active-only').addEventListener('change', () => { cmdbPage = 1; searchCmdb(); });
       document.getElementById('cmdb-detail-close').addEventListener('click', () => { document.getElementById('cmdb-detail').style.display = 'none'; });
     }
 
@@ -437,6 +444,10 @@
       } else {
         aql = `objectType = "${typeName}" AND objectSchemaId = ${schemaId}`;
       }
+      const nameSearch = document.getElementById('cmdb-name-search').value.trim();
+      if (nameSearch) aql += ` AND Name LIKE "${nameSearch}"`;
+      const activeOnly = document.getElementById('cmdb-active-only').checked;
+      if (activeOnly) aql += ` AND Status = "Active"`;
       const extra = document.getElementById('cmdb-search').value.trim();
       if (extra) aql += ` AND ${extra}`;
 
@@ -451,14 +462,36 @@
       const totalLabel = isLast ? shownSoFar : `${shownSoFar}+`;
       document.getElementById('cmdb-status').textContent = `${entries.length} Objekte (Seite ${cmdbPage}${isLast ? '' : ', weitere vorhanden'})`;
 
+      // Build attribute name lookup from objectTypeAttributes
+      cmdbAttrMap = {};
+      (data.objectTypeAttributes || []).forEach(a => { cmdbAttrMap[a.id] = a.name; });
+
       const tbody = document.getElementById('cmdb-rows');
       if (!entries.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Keine Ergebnisse</td></tr>'; return; }
 
+      // Find the "Status" attribute ID from the attribute map
+      let statusAttrId = null;
+      for (const [id, name] of Object.entries(cmdbAttrMap)) {
+        if (name === 'Status') { statusAttrId = id; break; }
+      }
+
       tbody.innerHTML = '';
       entries.forEach(obj => {
+        // Extract status value
+        let statusVal = '';
+        if (statusAttrId) {
+          const statusAttr = (obj.attributes || []).find(a => String(a.objectTypeAttributeId) === String(statusAttrId));
+          if (statusAttr) statusVal = (statusAttr.objectAttributeValues || []).map(v => v.displayValue || v.value || '').join('');
+        }
+        const statusDot = statusVal.toLowerCase() === 'active'
+          ? '<span style="color:#4caf50;font-size:1.2em;" title="Active">&#9679;</span> '
+          : statusVal
+            ? '<span style="color:#f44336;font-size:1.2em;" title="' + e(statusVal) + '">&#9679;</span> '
+            : '';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><strong>${e(obj.objectKey || '')}</strong></td>
+          <td>${statusDot}<strong>${e(obj.objectKey || '')}</strong></td>
           <td>${e(obj.label || obj.name || '')}</td>
           <td>${e(obj.objectType?.name || '')}</td>
           <td>${fmtDate(obj.created)}</td><td>${fmtDate(obj.updated)}</td>
@@ -489,7 +522,8 @@
       addRow('Key', obj.objectKey || ''); addRow('Name', obj.label || obj.name || ''); addRow('Typ', obj.objectType?.name || '');
 
       (obj.attributes || []).forEach(a => {
-        const name = a.objectTypeAttribute?.name || a.objectTypeAttributeId || '';
+        const attrId = a.objectTypeAttributeId || a.objectTypeAttribute?.id || '';
+        const name = cmdbAttrMap[attrId] || a.objectTypeAttribute?.name || attrId || '';
         const vals = (a.objectAttributeValues || []).map(v => v.displayValue || v.value || '').join(', ');
         if (name && vals) addRow(name, vals);
       });
