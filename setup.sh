@@ -183,7 +183,36 @@ start_containers() {
 }
 
 # ==============================================================================
-# 7. Admin-Benutzer anlegen
+# 7. Secrets fuer www-data bereitstellen und DB-Passwort setzen
+# ==============================================================================
+setup_runtime_secrets() {
+    info "Kopiere Secrets fuer Web-Container..."
+
+    # Docker Secrets sind root:root 600 auf einem read-only tmpfs.
+    # Apache (www-data) kann sie nicht lesen. Wir kopieren sie in
+    # ein beschreibbares Verzeichnis mit www-data-Berechtigungen.
+    docker exec accounting-web bash -c "
+        mkdir -p /var/www/secrets
+        cp /run/secrets/pg_password /var/www/secrets/pg_password
+        cp /run/secrets/vault_key /var/www/secrets/vault_key
+        chown -R www-data:www-data /var/www/secrets
+        chmod 700 /var/www/secrets
+        chmod 600 /var/www/secrets/*
+    "
+    ok "Secrets fuer www-data bereitgestellt."
+
+    # Postgres-Passwort setzen (POSTGRES_PASSWORD_FILE wird nur bei
+    # der allerersten Initialisierung gelesen, danach nicht mehr)
+    info "Setze PostgreSQL-Passwort..."
+    local pg_pass
+    pg_pass=$(cat "$SCRIPT_DIR/secrets/pg_password.txt")
+    docker exec accounting-postgres psql -U accounting -c \
+        "ALTER USER accounting PASSWORD '${pg_pass}';" >/dev/null 2>&1 || true
+    ok "PostgreSQL-Passwort gesetzt."
+}
+
+# ==============================================================================
+# 8. Admin-Benutzer anlegen
 # ==============================================================================
 setup_admin() {
     # Pruefen ob bereits ein Admin existiert
@@ -301,6 +330,7 @@ case "$MODE" in
         setup_env
         setup_directories
         start_containers
+        setup_runtime_secrets
         setup_admin
         show_status
         ;;
@@ -310,6 +340,17 @@ case "$MODE" in
         git pull || warn "Git pull fehlgeschlagen — fahre mit lokalem Stand fort."
         setup_directories
         docker compose up -d --build
+        # Warte auf Postgres
+        info "Warte auf PostgreSQL..."
+        local retries=30
+        while [ $retries -gt 0 ]; do
+            if docker exec accounting-postgres pg_isready -U accounting &>/dev/null; then
+                break
+            fi
+            retries=$((retries - 1))
+            sleep 1
+        done
+        setup_runtime_secrets
         ok "Update abgeschlossen."
         docker compose ps
         ;;
@@ -321,6 +362,7 @@ case "$MODE" in
         setup_env
         setup_directories
         start_containers
+        setup_runtime_secrets
         setup_admin
         show_status
         ;;
