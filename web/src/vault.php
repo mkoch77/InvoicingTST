@@ -4,7 +4,18 @@ require_once __DIR__ . '/db.php';
 
 function getVaultKey(): string
 {
-    // Read from Docker secret file first, fall back to env var
+    // Read from copied secret (www-data readable) > Docker secret > env var
+    $secretPaths = [
+        '/var/www/secrets/vault_key',    // Copied by start.sh for www-data
+        '/run/secrets/vault_key',         // Docker secret (root only, works for CLI)
+    ];
+    foreach ($secretPaths as $path) {
+        if (is_readable($path)) {
+            $key = trim(file_get_contents($path));
+            if ($key !== '') return $key;
+        }
+    }
+
     $keyFile = getenv('VAULT_KEY_FILE');
     if ($keyFile && is_readable($keyFile)) {
         $key = trim(file_get_contents($keyFile));

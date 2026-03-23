@@ -189,7 +189,7 @@ setup_admin() {
     # Pruefen ob bereits ein Admin existiert
     local admin_exists
     admin_exists=$(docker exec accounting-postgres psql -U accounting -d InvoicingAssets \
-        -tAc "SELECT COUNT(*) FROM users WHERE role = 'admin'" 2>/dev/null || echo "0")
+        -tAc "SELECT COUNT(*) FROM app_user WHERE role = 'admin'" 2>/dev/null || echo "0")
 
     if [ "$admin_exists" -gt 0 ] 2>/dev/null; then
         ok "Admin-Benutzer existiert bereits."
@@ -222,7 +222,7 @@ setup_admin() {
     hash=$(docker exec accounting-web php -r "echo password_hash('$admin_pass', PASSWORD_BCRYPT);")
 
     docker exec accounting-postgres psql -U accounting -d InvoicingAssets -c \
-        "INSERT INTO users (username, password_hash, display_name, role)
+        "INSERT INTO app_user (username, password_hash, display_name, role)
          VALUES ('$admin_user', '$hash', 'Administrator', 'admin')
          ON CONFLICT (username) DO NOTHING;"
 

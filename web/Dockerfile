@@ -39,8 +39,22 @@ RUN echo '0 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sy
     && echo '* * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/backup.php >> /var/log/cron-backup.log 2>&1' > /etc/cron.d/backup \
     && chmod 644 /etc/cron.d/cmdb-sync /etc/cron.d/backup
 
-# Startup: export env vars for cron, then start cron + Apache
+# Verzeichnis fuer lesbare Secrets-Kopien
+RUN mkdir -p /var/www/secrets && chown www-data:www-data /var/www/secrets && chmod 700 /var/www/secrets
+
+# Startup: copy secrets for www-data, export env vars for cron, start cron + Apache
 RUN printf '#!/bin/bash\n\
+# Copy Docker secrets so www-data can read them\n\
+if [ -f /run/secrets/pg_password ]; then\n\
+    cp /run/secrets/pg_password /var/www/secrets/pg_password\n\
+    chown www-data:www-data /var/www/secrets/pg_password\n\
+    chmod 600 /var/www/secrets/pg_password\n\
+fi\n\
+if [ -f /run/secrets/vault_key ]; then\n\
+    cp /run/secrets/vault_key /var/www/secrets/vault_key\n\
+    chown www-data:www-data /var/www/secrets/vault_key\n\
+    chmod 600 /var/www/secrets/vault_key\n\
+fi\n\
 # Pass environment variables to cron\n\
 printenv | grep -E "^(PG|VAULT_KEY|ENTRA_)" > /etc/environment\n\
 cron\n\
