@@ -20,14 +20,13 @@ $action = $_GET['action'] ?? '';
 // Status check does not need a live connection
 if ($action === 'status') {
     require_once __DIR__ . '/../../src/vault.php';
-    $hasOAuth = !empty(getVaultSecret('jira_client_id'))
-             && !empty(getVaultSecret('jira_client_secret'))
-             && !empty(getVaultSecret('jira_workspace_id'));
-    $hasTokens = !empty(getVaultSecret('jira_refresh_token'));
+    $hasConfig = !empty(getVaultSecret('jira_api_token'))
+              && !empty(getVaultSecret('jira_workspace_id'));
     echo json_encode([
-        'configured'  => $hasOAuth && $hasTokens,
-        'oauth_ready' => $hasOAuth,
-        'authorized'  => $hasTokens,
+        'configured'  => $hasConfig,
+        'oauth_ready' => $hasConfig,
+        'authorized'  => $hasConfig,
+        'auth_method' => 'scoped_api_token',
     ]);
     exit;
 }
