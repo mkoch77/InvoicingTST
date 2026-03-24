@@ -13,6 +13,10 @@
       <div class="controls">
         <label for="month-select">Monat:</label>
         <select id="month-select"><option value="">Laden…</option></select>
+        <label for="model-select">Modell:</label>
+        <select id="model-select"><option value="">Alle</option></select>
+        <label for="category-select">Kategorie:</label>
+        <select id="category-select"><option value="">Alle</option></select>
         <input type="text" id="search-input" placeholder="Suchen…" />
         <label for="page-size">Zeilen:</label>
         <select id="page-size">
@@ -57,13 +61,34 @@
       const res = await fetch(`/api/devices.php?month=${encodeURIComponent(month)}`);
       const data = await res.json();
       allDevices = data.devices || [];
+      populateFilters();
       currentPage = 1;
       renderTable();
     }
 
+    function populateFilters() {
+      const modelSel = document.getElementById('model-select');
+      const catSel = document.getElementById('category-select');
+      const curModel = modelSel.value;
+      const curCat = catSel.value;
+
+      const models = [...new Set(allDevices.map(d => d.model || '').filter(Boolean))].sort();
+      const cats = [...new Set(allDevices.map(d => d.device_category || '').filter(Boolean))].sort();
+
+      modelSel.innerHTML = '<option value="">Alle</option>';
+      for (const m of models) { const o = document.createElement('option'); o.value = m; o.textContent = m; if (m === curModel) o.selected = true; modelSel.appendChild(o); }
+
+      catSel.innerHTML = '<option value="">Alle</option>';
+      for (const c of cats) { const o = document.createElement('option'); o.value = c; o.textContent = c; if (c === curCat) o.selected = true; catSel.appendChild(o); }
+    }
+
     function getFiltered() {
       const q = document.getElementById('search-input').value.toLowerCase();
+      const modelFilter = document.getElementById('model-select').value;
+      const catFilter = document.getElementById('category-select').value;
       return allDevices.filter(d => {
+        if (modelFilter && (d.model || '') !== modelFilter) return false;
+        if (catFilter && (d.device_category || '') !== catFilter) return false;
         if (!q) return true;
         return [d.device_name,d.user_display_name,d.user_principal_name,d.manufacturer,d.model,d.device_category,d.serial_number,d.company_name,d.cost_center].join(' ').toLowerCase().includes(q);
       });
@@ -103,6 +128,8 @@
 
     document.getElementById('month-select').addEventListener('change',e=>{currentMonth=e.target.value;loadDevices(currentMonth);});
     document.getElementById('search-input').addEventListener('input',()=>{currentPage=1;renderTable();});
+    document.getElementById('model-select').addEventListener('change',()=>{currentPage=1;renderTable();});
+    document.getElementById('category-select').addEventListener('change',()=>{currentPage=1;renderTable();});
     document.getElementById('page-size').addEventListener('change',()=>{currentPage=1;renderTable();});
     document.getElementById('sync-btn').addEventListener('click',async()=>{
       const btn=document.getElementById('sync-btn');btn.disabled=true;btn.textContent='Synchronisiere…';
