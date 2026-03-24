@@ -49,6 +49,10 @@ INSERT INTO license_sku (sku_id, sku_part_number, display_name) VALUES
     ('placeholder_visio',               'VISIOCLIENT',                  'Visio Plan 2'),
     ('placeholder_pbi_premium',         'PBI_PREMIUM_PER_USER',         'Power BI Premium Per User'),
     ('placeholder_teams_rooms',         'Microsoft_Teams_Rooms_Pro',    'Teams Rooms Pro'),
-    ('placeholder_o365_no_teams',       'O365_w_o_Teams_Bundle_E3',     'Office 365 E3 (ohne Teams)'),
-    ('placeholder_m365_f1',             'M365_F1_COMM',                 'Microsoft 365 F1')
+    ('placeholder_o365_no_teams',       'O365_w/o_Teams_Bundle_E3',     'Office 365 E3 (ohne Teams)'),
+    ('placeholder_m365_f1',             'M365_F1_COMM',                 'Microsoft 365 F1'),
+    ('placeholder_identity_threat',     'IDENTITY_THREAT_PROTECTION',   'Entra ID P2 + Identity Threat Protection'),
+    ('placeholder_teams_eea',           'Microsoft_Teams_EEA_New',      'Microsoft Teams EEA'),
+    ('placeholder_copilot',             'Microsoft_365_Copilot',        'Microsoft 365 Copilot'),
+    ('placeholder_aad_p2',              'AAD_PREMIUM_P2',               'Azure AD Premium P2')
 ON CONFLICT (sku_id) DO NOTHING;

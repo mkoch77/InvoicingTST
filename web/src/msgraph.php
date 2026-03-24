@@ -153,7 +153,9 @@ function syncEntraLicenses(string $username = 'system'): array
         'SPE_E3', 'SPE_E5', 'INTUNE_A_D', 'PROJECT_PLAN3_DEPT',
         'PROJECTPREMIUM', 'PROJECTPROFESSIONAL', 'VISIOCLIENT',
         'PBI_PREMIUM_PER_USER', 'Microsoft_Teams_Rooms_Pro',
-        'O365_w_o_Teams_Bundle_E3', 'M365_F1_COMM',
+        'O365_w/o_Teams_Bundle_E3', 'M365_F1_COMM',
+        'IDENTITY_THREAT_PROTECTION', 'Microsoft_Teams_EEA_New',
+        'Microsoft_365_Copilot', 'AAD_PREMIUM_P2',
     ];
 
     // 1. Fetch subscribed SKUs and build map
