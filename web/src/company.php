@@ -28,10 +28,11 @@ function syncCompanyStructure(string $username = 'system'): array
     $getAttr = function(array $attrs, string $attrId): string {
         foreach ($attrs as $a) {
             if ((string)($a['objectTypeAttributeId'] ?? '') === $attrId) {
-                return implode(', ', array_map(
+                $values = array_unique(array_filter(array_map(
                     fn($v) => $v['displayValue'] ?? $v['value'] ?? '',
                     $a['objectAttributeValues'] ?? []
-                ));
+                )));
+                return implode(', ', $values);
             }
         }
         return '';
