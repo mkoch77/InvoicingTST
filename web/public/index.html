@@ -245,7 +245,7 @@
             <div class="vm-stats-grid">
               <div class="stat-row stat-total">
                 <span class="stat-label">${data.total_devices || d.total} Geräte</span>
-                <span class="stat-value">${data.total_price ? fmtEur(data.total_price) : ''}</span>
+                <span class="stat-value">${fmtEur(data.total_price || 0)}</span>
               </div>
             </div>
           `;
