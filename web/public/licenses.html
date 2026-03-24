@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microsoft 365 Lizenzen – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Microsoft 365 Lizenzen – Rohdaten</h1>
+      <div class="controls">
+        <label for="month-select">Monat:</label>
+        <select id="month-select"><option value="">Laden…</option></select>
+        <label for="sku-select">Lizenz:</label>
+        <select id="sku-select"><option value="">Alle</option></select>
+        <input type="text" id="search-input" placeholder="Suchen…" />
+        <label for="page-size">Zeilen:</label>
+        <select id="page-size">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="all">Alle</option>
+        </select>
+        <span id="user-count" class="count"></span>
+        <button id="sync-btn" class="btn" title="Aus Entra ID synchronisieren">Entra Sync</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="display_name">Name</th>
+            <th data-key="user_principal_name">E-Mail</th>
+            <th data-key="license_name">Lizenz</th>
+            <th data-key="department">Abteilung</th>
+            <th data-key="company_name">Firma</th>
+            <th data-key="street_address">Adresse</th>
+            <th data-key="city">Ort</th>
+          </tr>
+        </thead>
+        <tbody id="user-rows">
+          <tr><td colspan="7" class="empty">Daten werden geladen…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination" class="pagination"></div>
+  </div>
+
+  <script src="/app.js?v=10"></script>
+  <script>
+    let allUsers = [];
+    let currentMonth = '';
+    let currentPage = 1;
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+    function formatMonth(m) {
+      if (!m) return '';
+      const [y, mo] = m.split('-');
+      return new Date(y, parseInt(mo) - 1).toLocaleDateString('de-DE', { year: 'numeric', month: 'long' });
+    }
+
+    async function init() {
+      const mRes = await fetch('/api/licenses.php?action=months');
+      const months = await mRes.json();
+      const mSel = document.getElementById('month-select');
+      mSel.innerHTML = '';
+      for (const m of months.slice(0, 6)) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = formatMonth(m);
+        mSel.appendChild(opt);
+      }
+      if (months.length > 0) {
+        currentMonth = months[0];
+        loadUsers(currentMonth);
+      } else {
+        document.getElementById('user-rows').innerHTML =
+          '<tr><td colspan="7" class="empty">Keine Lizenzdaten. Bitte "Entra Sync" ausf\u00FChren.</td></tr>';
+      }
+    }
+
+    async function loadUsers(month, sku) {
+      let url = `/api/licenses.php?action=users&month=${encodeURIComponent(month)}`;
+      if (sku) url += `&sku=${encodeURIComponent(sku)}`;
+
+      const res = await fetch(url);
+      allUsers = await res.json();
+      if (allUsers.error) {
+        document.getElementById('user-rows').innerHTML =
+          `<tr><td colspan="7" class="empty">Fehler: ${esc(allUsers.error)}</td></tr>`;
+        return;
+      }
+
+      // Populate SKU filter
+      const skuSel = document.getElementById('sku-select');
+      if (skuSel.options.length <= 1) {
+        const skuNames = [...new Set(allUsers.map(u => u.license_name))].sort();
+        for (const s of skuNames) {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          skuSel.appendChild(opt);
+        }
+      }
+
+      currentPage = 1;
+      renderTable();
+    }
+
+    function getFiltered() {
+      const query = document.getElementById('search-input').value.toLowerCase();
+      const skuFilter = document.getElementById('sku-select').value;
+      return allUsers.filter(u => {
+        if (skuFilter && u.license_name !== skuFilter) return false;
+        if (query) {
+          const searchable = [u.display_name, u.user_principal_name, u.license_name,
+            u.department, u.company_name, u.street_address, u.city].join(' ').toLowerCase();
+          if (!searchable.includes(query)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderTable() {
+      const filtered = getFiltered();
+      const tbody = document.getElementById('user-rows');
+      const pageSizeEl = document.getElementById('page-size');
+      const pageSize = pageSizeEl.value === 'all' ? filtered.length : parseInt(pageSizeEl.value);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * pageSize;
+      const pageData = filtered.slice(start, start + pageSize);
+
+      document.getElementById('user-count').textContent = `${filtered.length} Eintr\u00E4ge`;
+
+      tbody.innerHTML = '';
+      if (pageData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">Keine Ergebnisse</td></tr>';
+      } else {
+        for (const u of pageData) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${esc(u.display_name)}</td>
+            <td>${esc(u.user_principal_name)}</td>
+            <td>${esc(u.license_name)}</td>
+            <td>${esc(u.department || '')}</td>
+            <td>${esc(u.company_name || '')}</td>
+            <td>${esc(u.street_address || '')}</td>
+            <td>${esc(u.city || '')}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      // Pagination
+      const pag = document.getElementById('pagination');
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let html = '';
+      if (currentPage > 1) html += `<button onclick="goPage(${currentPage-1})">&laquo;</button>`;
+      for (let p = Math.max(1, currentPage-2); p <= Math.min(totalPages, currentPage+2); p++) {
+        html += `<button class="${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+      }
+      if (currentPage < totalPages) html += `<button onclick="goPage(${currentPage+1})">&raquo;</button>`;
+      pag.innerHTML = html;
+    }
+
+    function goPage(p) { currentPage = p; renderTable(); }
+
+    document.getElementById('month-select').addEventListener('change', e => {
+      currentMonth = e.target.value;
+      document.getElementById('sku-select').innerHTML = '<option value="">Alle</option>';
+      loadUsers(currentMonth);
+    });
+    document.getElementById('sku-select').addEventListener('change', () => { currentPage = 1; renderTable(); });
+    document.getElementById('search-input').addEventListener('input', () => { currentPage = 1; renderTable(); });
+    document.getElementById('page-size').addEventListener('change', () => { currentPage = 1; renderTable(); });
+
+    document.getElementById('sync-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('sync-btn');
+      btn.disabled = true; btn.textContent = 'Synchronisiere…';
+      try {
+        const res = await fetch('/api/licenses.php', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync' }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        if (typeof showToast === 'function') showToast(data.message, 'success');
+        document.getElementById('sku-select').innerHTML = '<option value="">Alle</option>';
+        loadUsers(currentMonth);
+      } catch (err) {
+        if (typeof showToast === 'function') showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Entra Sync';
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

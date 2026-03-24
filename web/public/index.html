@@ -27,6 +27,15 @@
           <a href="/vms.html" class="card-link">Alle VMs anzeigen &rarr;</a>
         </div>
 
+        <div class="card card-vm">
+          <div class="card-icon">&#x1F4BB;</div>
+          <h2>Microsoft 365 Lizenzen</h2>
+          <div id="license-raw-stats" class="vm-stats">
+            <div class="vm-stats-loading">Lade Lizenzdaten…</div>
+          </div>
+          <a href="/licenses.html" class="card-link">Alle Lizenzen anzeigen &rarr;</a>
+        </div>
+
       </div>
     </div>
 
@@ -101,6 +110,7 @@
         // Billing cards
         renderBilling(s);
         renderLicenses(s);
+        renderLicenseRaw(s);
       } catch (err) {
         container.innerHTML = `<div class="vm-stats-loading">Fehler: ${err.message}</div>`;
       }
@@ -120,6 +130,29 @@
           <div class="stat-row stat-total">
             <span class="stat-label">${b.vm_count} Server</span>
             <span class="stat-value">${fmtEur(b.total_price)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLicenseRaw(s) {
+      const container = document.getElementById('license-raw-stats');
+      const l = s.licenses;
+      if (!l || !l.month) {
+        container.innerHTML = '<div class="vm-stats-loading">Keine Lizenzdaten vorhanden</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="vm-stats-month">${formatMonth(l.month)}</div>
+        <div class="vm-stats-grid">
+          <div class="stat-row stat-total">
+            <span class="stat-label">Lizenzzuweisungen</span>
+            <span class="stat-value">${l.total_users}</span>
+          </div>
+          <div class="stat-row stat-muted">
+            <span class="stat-label">Lizenztypen</span>
+            <span class="stat-value">${l.sku_count}</span>
           </div>
         </div>
       `;

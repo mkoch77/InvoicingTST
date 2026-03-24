@@ -72,6 +72,9 @@ function buildSidebar() {
         <a href="/vms.html" class="sidebar-link ${path === '/vms.html' ? 'active' : ''}">
           <span class="icon">&#x1F5A5;</span><span class="label">Virtuelle Maschinen</span>
         </a>
+        <a href="/licenses.html" class="sidebar-link ${path === '/licenses.html' ? 'active' : ''}">
+          <span class="icon">&#x1F4BB;</span><span class="label">Microsoft 365 Lizenzen</span>
+        </a>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Abrechnung</div>
