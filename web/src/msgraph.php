@@ -263,11 +263,92 @@ function syncEntraLicenses(string $username = 'system'): array
         }
     }
 
-    AppLogger::info('license-sync', "Sync complete: {$userCount} users, {$assignCount} assignments for {$currentMonth}", [], $username);
+    // 3. Enrich users with CMDB data (cost center + company from CMDB2 User objects)
+    $cmdbEnriched = 0;
+    try {
+        require_once __DIR__ . '/jira_assets.php';
+        $cmdb = new JiraAssetsClient();
+
+        $CMDB_USER_EMAIL = '2050';
+        $CMDB_USER_COST_CENTER = '2059';
+        $CMDB_USER_COST_CENTER_HR = '2275';
+        $CMDB_USER_COMPANY = '2054';
+
+        $getAttr = function(array $attrs, string $attrId): string {
+            foreach ($attrs as $a) {
+                if ((string)($a['objectTypeAttributeId'] ?? '') === $attrId) {
+                    $values = array_unique(array_filter(array_map(
+                        fn($v) => $v['displayValue'] ?? $v['value'] ?? '',
+                        $a['objectAttributeValues'] ?? []
+                    )));
+                    return implode(', ', $values);
+                }
+            }
+            return '';
+        };
+
+        // Load valid cost center numbers from DB
+        $validCostCenters = [];
+        $ccRows = $pdo->query("SELECT name FROM cost_center")->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($ccRows as $ccName) {
+            $validCostCenters[$ccName] = true;
+        }
+
+        // Fetch all active CMDB users
+        $cmdbUsers = $cmdb->searchAllObjects('objectType = "User" AND objectSchemaId = 8 AND Status = "Active"');
+        AppLogger::info('license-sync', 'Fetched ' . count($cmdbUsers) . ' CMDB User objects', [], $username);
+
+        // Build email → (cost_center, company) map
+        $cmdbMap = [];
+        foreach ($cmdbUsers as $obj) {
+            $email = strtolower($getAttr($obj['attributes'] ?? [], $CMDB_USER_EMAIL));
+            $ccHR = $getAttr($obj['attributes'] ?? [], $CMDB_USER_COST_CENTER_HR);
+            $ccNormal = $getAttr($obj['attributes'] ?? [], $CMDB_USER_COST_CENTER);
+            $company = $getAttr($obj['attributes'] ?? [], $CMDB_USER_COMPANY);
+
+            // Priorität: CostCenterFromHR wenn es eine gültige Zahl ist die in cost_center existiert
+            $cc = '';
+            if ($ccHR && preg_match('/^\d+$/', $ccHR) && isset($validCostCenters[$ccHR])) {
+                $cc = $ccHR;
+            } elseif ($ccNormal && preg_match('/^\d+$/', $ccNormal) && isset($validCostCenters[$ccNormal])) {
+                $cc = $ccNormal;
+            } elseif ($ccNormal) {
+                $cc = $ccNormal; // Fallback: use as-is even if not in cost_center table
+            }
+
+            if ($email) {
+                $cmdbMap[$email] = ['cost_center' => $cc, 'company' => $company];
+            }
+        }
+
+        // Update entra_user with CMDB data
+        $enrichStmt = $pdo->prepare("
+            UPDATE entra_user SET cost_center = :cc, company_name = COALESCE(NULLIF(:company, ''), company_name)
+            WHERE LOWER(user_principal_name) = :upn
+        ");
+
+        foreach ($cmdbMap as $email => $data) {
+            if ($data['cost_center']) {
+                $enrichStmt->execute([
+                    'cc'      => $data['cost_center'],
+                    'company' => $data['company'],
+                    'upn'     => $email,
+                ]);
+                if ($enrichStmt->rowCount() > 0) $cmdbEnriched++;
+            }
+        }
+
+        AppLogger::info('license-sync', "CMDB enrichment: {$cmdbEnriched} users updated with cost center", [], $username);
+    } catch (\Exception $e) {
+        AppLogger::warn('license-sync', "CMDB enrichment failed (non-critical): {$e->getMessage()}", [], $username);
+    }
+
+    AppLogger::info('license-sync', "Sync complete: {$userCount} users, {$assignCount} assignments, {$cmdbEnriched} CMDB-enriched for {$currentMonth}", [], $username);
 
     return [
         'users'       => $userCount,
         'assignments' => $assignCount,
+        'cmdb'        => $cmdbEnriched,
         'month'       => $currentMonth,
     ];
 }
