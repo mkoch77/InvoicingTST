@@ -236,8 +236,7 @@
         container.innerHTML = '<div class="vm-stats-loading">Keine Gerätedaten vorhanden</div>';
         return;
       }
-      // Fetch billing total
-      fetch(`/api/billing-devices.php?month=${encodeURIComponent(d.month)}`)
+      fetch(`/api/device-billing-summary.php?month=${encodeURIComponent(d.month)}`)
         .then(r => r.json())
         .then(data => {
           container.innerHTML = `
