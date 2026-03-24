@@ -16,7 +16,7 @@
           <option value="">Bitte wählen…</option>
           <option value="customers">Kundenkürzel</option>
           <option value="company">Firmenstruktur</option>
-          <option value="pricing">Preisklassen &amp; Punktefaktoren</option>
+          <option value="pricing">Preislisten</option>
           <option value="configurator">Kalkulator</option>
         </select>
       </div>
@@ -127,25 +127,28 @@
 
     function renderPricingModule(container) {
       container.innerHTML = `
-        <div class="settings-grid">
-          <div class="settings-section">
-            <h2>Punktefaktoren</h2>
-            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
-              Punkte pro Einheit. Gesamtpunkte = (vCPU &times; Faktor) + (RAM GB &times; Faktor) + (Storage GB &times; Faktor)
-            </p>
-            <div id="factors-container"></div>
-            <button class="btn" id="save-factors-btn" style="margin-top:1rem;">Faktoren speichern</button>
-          </div>
-          <div class="settings-section" style="grid-column: span 2;">
-            <h2>Preisklassen</h2>
-            <div class="table-wrap" style="max-height:600px;overflow-y:auto;">
-              <table>
-                <thead><tr><th>Klasse</th><th>Bis Punkte</th><th>Preis (EUR)</th></tr></thead>
-                <tbody id="tiers-rows"></tbody>
-              </table>
+        <div class="card-group">
+          <h2 class="card-group-title">IaaS – Server Hosting</h2>
+          <div class="settings-grid">
+            <div class="settings-section">
+              <h2>Punktefaktoren</h2>
+              <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+                Punkte pro Einheit. Gesamtpunkte = (vCPU &times; Faktor) + (RAM GB &times; Faktor) + (Storage GB &times; Faktor)
+              </p>
+              <div id="factors-container"></div>
+              <button class="btn" id="save-factors-btn" style="margin-top:1rem;">Faktoren speichern</button>
             </div>
-            <div style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem;">
-              <button class="btn" id="save-tiers-btn">Preisklassen speichern</button>
+            <div class="settings-section" style="grid-column: span 2;">
+              <h2>Preisklassen</h2>
+              <div class="table-wrap" style="max-height:600px;overflow-y:auto;">
+                <table>
+                  <thead><tr><th>Klasse</th><th>Bis Punkte</th><th>Preis (EUR)</th></tr></thead>
+                  <tbody id="tiers-rows"></tbody>
+                </table>
+              </div>
+              <div style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem;">
+                <button class="btn" id="save-tiers-btn">Preisklassen speichern</button>
+              </div>
             </div>
           </div>
         </div>
