@@ -69,6 +69,14 @@ class MsGraphClient
     }
 
     /**
+     * Public wrapper for graphGet (used by intune.php etc.)
+     */
+    public function graphGetPublic(string $url): array
+    {
+        return $this->graphGet($url);
+    }
+
+    /**
      * GET request to Microsoft Graph API with pagination support.
      */
     private function graphGet(string $url): array

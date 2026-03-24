@@ -75,6 +75,9 @@ function buildSidebar() {
         <a href="/licenses.html" class="sidebar-link ${path === '/licenses.html' ? 'active' : ''}">
           <span class="icon">&#x1F4BB;</span><span class="label">Microsoft 365 Lizenzen</span>
         </a>
+        <a href="/devices.html" class="sidebar-link ${path === '/devices.html' ? 'active' : ''}">
+          <span class="icon">&#x1F4F1;</span><span class="label">Notebooks / Clients</span>
+        </a>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Abrechnung</div>
@@ -83,6 +86,9 @@ function buildSidebar() {
         </a>
         <a href="/billing/licenses.html" class="sidebar-link ${path === '/billing/licenses.html' ? 'active' : ''}">
           <span class="icon">&#x1F4BB;</span><span class="label">Microsoft 365 Lizenzen</span>
+        </a>
+        <a href="/billing/devices.html" class="sidebar-link ${path === '/billing/devices.html' ? 'active' : ''}">
+          <span class="icon">&#x1F4F1;</span><span class="label">Client Services</span>
         </a>
       </div>
       <div class="sidebar-section">

@@ -36,6 +36,15 @@
           <a href="/licenses.html" class="card-link">Alle Lizenzen anzeigen &rarr;</a>
         </div>
 
+        <div class="card card-vm">
+          <div class="card-icon">&#x1F4F1;</div>
+          <h2>Notebooks / Clients</h2>
+          <div id="device-raw-stats" class="vm-stats">
+            <div class="vm-stats-loading">Lade Gerätedaten…</div>
+          </div>
+          <a href="/devices.html" class="card-link">Alle Geräte anzeigen &rarr;</a>
+        </div>
+
       </div>
     </div>
 
@@ -59,6 +68,15 @@
             <div class="vm-stats-loading">Lade Lizenzdaten…</div>
           </div>
           <a href="/billing/licenses.html" class="card-link">Abrechnung anzeigen &rarr;</a>
+        </div>
+
+        <div class="card card-vm">
+          <div class="card-icon">&#x1F4F1;</div>
+          <h2>Client Services</h2>
+          <div id="device-billing-stats" class="vm-stats">
+            <div class="vm-stats-loading">Lade Gerätedaten…</div>
+          </div>
+          <a href="/billing/devices.html" class="card-link">Abrechnung anzeigen &rarr;</a>
         </div>
 
       </div>
@@ -111,6 +129,8 @@
         renderBilling(s);
         renderLicenses(s);
         renderLicenseRaw(s);
+        renderDeviceRaw(s);
+        renderDeviceBilling(s);
       } catch (err) {
         container.innerHTML = `<div class="vm-stats-loading">Fehler: ${err.message}</div>`;
       }
@@ -180,6 +200,48 @@
           <div class="stat-row stat-total">
             <span class="stat-label">${l.total_users} Lizenzzuweisungen</span>
             <span class="stat-value">${fmtEur(l.total_price)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDeviceRaw(s) {
+      const container = document.getElementById('device-raw-stats');
+      const d = s.devices;
+      if (!d || !d.month) {
+        container.innerHTML = '<div class="vm-stats-loading">Keine Gerätedaten vorhanden</div>';
+        return;
+      }
+      let rows = '';
+      for (const m of (d.by_manufacturer || [])) {
+        rows += `<div class="stat-row"><span class="stat-label">${m.name}</span><span class="stat-value">${m.count}</span></div>`;
+      }
+      container.innerHTML = `
+        <div class="vm-stats-month">${formatMonth(d.month)}</div>
+        <div class="vm-stats-grid">
+          ${rows}
+          <div class="stat-divider"></div>
+          <a href="/devices.html" class="stat-row stat-total">
+            <span class="stat-label">Gesamt</span>
+            <span class="stat-value">${d.total}</span>
+          </a>
+        </div>
+      `;
+    }
+
+    function renderDeviceBilling(s) {
+      const container = document.getElementById('device-billing-stats');
+      const d = s.devices;
+      if (!d || !d.month) {
+        container.innerHTML = '<div class="vm-stats-loading">Keine Gerätedaten vorhanden</div>';
+        return;
+      }
+      container.innerHTML = `
+        <div class="vm-stats-month">${formatMonth(d.month)}</div>
+        <div class="vm-stats-grid">
+          <div class="stat-row stat-total">
+            <span class="stat-label">${d.total} Geräte</span>
+            <span class="stat-value"></span>
           </div>
         </div>
       `;

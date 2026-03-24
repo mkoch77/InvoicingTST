@@ -118,6 +118,19 @@ try {
             'vm_count'     => array_sum(array_column($classCounts, 'count')),
         ],
         'licenses'      => $licStats,
+        'devices'       => (function() use ($pdo) {
+            $devMonth = $pdo->query("SELECT MAX(export_month) FROM intune_device")->fetchColumn() ?: '';
+            $stats = ['month' => $devMonth, 'total' => 0, 'by_manufacturer' => []];
+            if ($devMonth) {
+                $s = $pdo->prepare("SELECT COUNT(*) FROM intune_device WHERE export_month = :m");
+                $s->execute(['m' => $devMonth]);
+                $stats['total'] = (int) $s->fetchColumn();
+                $s = $pdo->prepare("SELECT COALESCE(manufacturer,'Unbekannt') AS name, COUNT(*) AS count FROM intune_device WHERE export_month = :m GROUP BY manufacturer ORDER BY count DESC");
+                $s->execute(['m' => $devMonth]);
+                $stats['by_manufacturer'] = $s->fetchAll(\PDO::FETCH_ASSOC);
+            }
+            return $stats;
+        })(),
     ]);
 } catch (Exception $e) {
     http_response_code(500);

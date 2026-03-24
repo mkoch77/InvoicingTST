@@ -42,6 +42,7 @@ RUN chown -R www-data:www-data /var/www \
 RUN echo '0 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-customers.php >> /var/log/cron-sync.log 2>&1' > /etc/cron.d/cmdb-sync \
     && echo '30 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-companies.php >> /var/log/cron-sync.log 2>&1' >> /etc/cron.d/cmdb-sync \
     && echo '15 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-licenses.php >> /var/log/cron-sync.log 2>&1' > /etc/cron.d/entra-sync \
+    && echo '45 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-devices.php >> /var/log/cron-sync.log 2>&1' >> /etc/cron.d/entra-sync \
     && echo '* * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/backup.php >> /var/log/cron-backup.log 2>&1' > /etc/cron.d/backup \
     && chmod 644 /etc/cron.d/cmdb-sync /etc/cron.d/entra-sync /etc/cron.d/backup
 
