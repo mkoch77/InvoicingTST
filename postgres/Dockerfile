@@ -8,4 +8,6 @@ COPY install-vault-schema.sql /docker-entrypoint-initdb.d/05-vault-schema.sql
 COPY install-log-schema.sql /docker-entrypoint-initdb.d/06-log-schema.sql
 COPY install-backup-schema.sql /docker-entrypoint-initdb.d/07-backup-schema.sql
 COPY install-configurator-schema.sql /docker-entrypoint-initdb.d/08-configurator-schema.sql
+COPY install-server-service-schema.sql /docker-entrypoint-initdb.d/09-server-service-schema.sql
+COPY install-company-schema.sql /docker-entrypoint-initdb.d/10-company-schema.sql
 RUN chmod 644 /docker-entrypoint-initdb.d/*.sql

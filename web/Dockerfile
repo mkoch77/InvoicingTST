@@ -1,5 +1,9 @@
 FROM php:8.3-apache
 
+# PHP Memory- und Timeout-Limits erhoehen (fuer CMDB-Sync mit grossen Datenmengen)
+RUN echo "memory_limit = 512M" > /usr/local/etc/php/conf.d/limits.ini \
+    && echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/limits.ini
+
 # PHP-Extensions installieren (pdo_pgsql, gd, zip fuer PhpSpreadsheet)
 RUN apt-get update \
     && apt-get install -y libpq-dev unzip libpng-dev libjpeg-dev libfreetype6-dev libzip-dev \

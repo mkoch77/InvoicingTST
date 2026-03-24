@@ -259,7 +259,25 @@ setup_admin() {
 }
 
 # ==============================================================================
-# 8. Status-Uebersicht
+# 8. Jira Assets einrichten (optional)
+# ==============================================================================
+setup_jira() {
+    echo ""
+    read -rp "Jira Assets einrichten? (j/n) [n]: " do_jira
+    if [ "${do_jira:-n}" != "j" ]; then
+        info "Jira-Setup uebersprungen. Spaeter ausfuehren mit: bash scripts/setup-jira.sh"
+        return
+    fi
+
+    if [ -f "$SCRIPT_DIR/scripts/setup-jira.sh" ]; then
+        bash "$SCRIPT_DIR/scripts/setup-jira.sh"
+    else
+        err "scripts/setup-jira.sh nicht gefunden."
+    fi
+}
+
+# ==============================================================================
+# 9. Status-Uebersicht
 # ==============================================================================
 show_status() {
     echo ""
@@ -332,6 +350,7 @@ case "$MODE" in
         start_containers
         setup_runtime_secrets
         setup_admin
+        setup_jira
         show_status
         ;;
 
@@ -342,7 +361,7 @@ case "$MODE" in
         docker compose up -d --build
         # Warte auf Postgres
         info "Warte auf PostgreSQL..."
-        local retries=30
+        retries=30
         while [ $retries -gt 0 ]; do
             if docker exec accounting-postgres pg_isready -U accounting &>/dev/null; then
                 break
@@ -364,6 +383,7 @@ case "$MODE" in
         start_containers
         setup_runtime_secrets
         setup_admin
+        setup_jira
         show_status
         ;;
 esac
