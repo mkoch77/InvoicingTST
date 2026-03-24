@@ -17,7 +17,7 @@ function syncIntuneDevices(string $username = 'system'): array
 
     // Fetch Windows devices from Intune (beta endpoint)
     $devices = $client->graphGetPublic(
-        "https://graph.microsoft.com/beta/deviceManagement/managedDevices?\$filter=operatingSystem eq 'Windows'&\$top=999"
+        'https://graph.microsoft.com/beta/deviceManagement/managedDevices?$filter=operatingSystem%20eq%20%27Windows%27&$top=999'
     );
 
     AppLogger::info('device-sync', 'Fetched ' . count($devices) . ' Windows devices from Intune', [], $username);
