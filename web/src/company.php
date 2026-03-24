@@ -127,7 +127,14 @@ function syncCompanyStructure(string $username = 'system'): array
         $synced++;
     }
 
-    // 3. Sync Server → IT-Service mapping
+    // 3. Build CostCenter → Customer lookup from synced data
+    $ccCustomerMap = [];
+    $ccRows = $pdo->query("SELECT name, customer FROM cost_center WHERE customer IS NOT NULL AND customer != ''")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($ccRows as $r) {
+        $ccCustomerMap[$r['name']] = $r['customer'];
+    }
+
+    // 4. Sync Server → IT-Service mapping (with CMDB customer)
     $SERVER_NAME = '1964';
     $SERVER_IT_SERVICE = '2613';
 
@@ -135,13 +142,13 @@ function syncCompanyStructure(string $username = 'system'): array
     AppLogger::info('company-sync', "Fetched " . count($serverObjects) . " active Server objects", [], $username);
 
     $ssmStmt = $pdo->prepare("
-        INSERT INTO server_service_mapping (hostname, it_service, cmdb_key, updated_at)
-        VALUES (:hostname, :it_service, :cmdb_key, NOW())
+        INSERT INTO server_service_mapping (hostname, it_service, cmdb_customer, cmdb_key, updated_at)
+        VALUES (:hostname, :it_service, :cmdb_customer, :cmdb_key, NOW())
         ON CONFLICT (hostname) DO UPDATE SET
             it_service = EXCLUDED.it_service,
+            cmdb_customer = EXCLUDED.cmdb_customer,
             cmdb_key = EXCLUDED.cmdb_key,
             updated_at = NOW()
-        WHERE server_service_mapping.it_service != EXCLUDED.it_service
     ");
 
     $serverSynced = 0;
@@ -155,9 +162,13 @@ function syncCompanyStructure(string $username = 'system'): array
         // Extract hostname (first part before domain)
         $hostname = strtoupper(explode('.', $name)[0]);
 
+        // Resolve customer: IT-Service name → CostCenter → Customer
+        $cmdbCustomer = $ccCustomerMap[$itService] ?? null;
+
         $ssmStmt->execute([
             'hostname' => $hostname,
             'it_service' => $itService,
+            'cmdb_customer' => $cmdbCustomer,
             'cmdb_key' => $key,
         ]);
         $serverSynced++;

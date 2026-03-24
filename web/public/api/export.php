@@ -31,17 +31,18 @@ try {
         'A' => ['title' => 'Hostname',                 'width' => 25],
         'B' => ['title' => 'DNS Name',                 'width' => 30],
         'C' => ['title' => 'Kunde',                    'width' => 20],
-        'D' => ['title' => 'IP Address',               'width' => 20],
-        'E' => ['title' => 'Operating System',         'width' => 30],
-        'F' => ['title' => 'vCPU',                     'width' =>  8],
-        'G' => ['title' => 'vRAM (MB)',                'width' => 12],
-        'H' => ['title' => 'Used Storage (GB)',        'width' => 18],
-        'I' => ['title' => 'Provisioned Storage (GB)', 'width' => 22],
-        'J' => ['title' => 'Power State',              'width' => 14],
-        'K' => ['title' => 'Punkte',                   'width' => 12],
-        'L' => ['title' => 'Klasse',                   'width' => 10],
-        'M' => ['title' => 'Preis (EUR)',              'width' => 14],
-        'N' => ['title' => 'Duplicate',                'width' => 12],
+        'D' => ['title' => 'Kunde (CMDB)',             'width' => 20],
+        'E' => ['title' => 'IP Address',               'width' => 20],
+        'F' => ['title' => 'Operating System',         'width' => 30],
+        'G' => ['title' => 'vCPU',                     'width' =>  8],
+        'H' => ['title' => 'vRAM (MB)',                'width' => 12],
+        'I' => ['title' => 'Used Storage (GB)',        'width' => 18],
+        'J' => ['title' => 'Provisioned Storage (GB)', 'width' => 22],
+        'K' => ['title' => 'Power State',              'width' => 14],
+        'L' => ['title' => 'Punkte',                   'width' => 12],
+        'M' => ['title' => 'Klasse',                   'width' => 10],
+        'N' => ['title' => 'Preis (EUR)',              'width' => 14],
+        'O' => ['title' => 'Duplicate',                'width' => 12],
     ];
 
     foreach ($headers as $col => $def) {
@@ -54,9 +55,9 @@ try {
         'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF4472C4']],
         'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
     ];
-    $sheet->getStyle('A1:N1')->applyFromArray($headerStyle);
+    $sheet->getStyle('A1:O1')->applyFromArray($headerStyle);
     $sheet->freezePane('A2');
-    $sheet->getStyle('D:D')->getNumberFormat()->setFormatCode('@');
+    $sheet->getStyle('E:E')->getNumberFormat()->setFormatCode('@');
 
     // Detect duplicate hostnames
     $hostCount = [];
@@ -78,24 +79,25 @@ try {
         $sheet->setCellValue("A{$rowNum}", $r['hostname'] ?? '');
         $sheet->setCellValue("B{$rowNum}", $r['dns_name'] ?? '');
         $sheet->setCellValue("C{$rowNum}", $customerLabel);
-        $sheet->setCellValueExplicit("D{$rowNum}", $ips, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-        $sheet->setCellValue("E{$rowNum}", $r['operating_system'] ?? '');
-        $sheet->setCellValue("F{$rowNum}", $r['vcpu'] ?? 0);
-        $sheet->setCellValue("G{$rowNum}", $r['vram_mb'] ?? 0);
-        $sheet->setCellValue("H{$rowNum}", $r['used_storage_gb'] ?? 0);
-        $sheet->setCellValue("I{$rowNum}", $r['provisioned_storage_gb'] ?? 0);
-        $sheet->setCellValue("J{$rowNum}", $r['power_state'] ?? '');
-        $sheet->setCellValue("K{$rowNum}", $r['points'] ?? 0);
-        $sheet->setCellValue("L{$rowNum}", $r['pricing_class'] ?? '');
-        $sheet->setCellValue("M{$rowNum}", $r['price'] ?? 0);
-        $sheet->setCellValue("N{$rowNum}", $isDupe ? 'Yes' : '');
+        $sheet->setCellValue("D{$rowNum}", $r['cmdb_customer'] ?? '');
+        $sheet->setCellValueExplicit("E{$rowNum}", $ips, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sheet->setCellValue("F{$rowNum}", $r['operating_system'] ?? '');
+        $sheet->setCellValue("G{$rowNum}", $r['vcpu'] ?? 0);
+        $sheet->setCellValue("H{$rowNum}", $r['vram_mb'] ?? 0);
+        $sheet->setCellValue("I{$rowNum}", $r['used_storage_gb'] ?? 0);
+        $sheet->setCellValue("J{$rowNum}", $r['provisioned_storage_gb'] ?? 0);
+        $sheet->setCellValue("K{$rowNum}", $r['power_state'] ?? '');
+        $sheet->setCellValue("L{$rowNum}", $r['points'] ?? 0);
+        $sheet->setCellValue("M{$rowNum}", $r['pricing_class'] ?? '');
+        $sheet->setCellValue("N{$rowNum}", $r['price'] ?? 0);
+        $sheet->setCellValue("O{$rowNum}", $isDupe ? 'Yes' : '');
 
         // Format price column
-        $sheet->getStyle("M{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle("K{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle("N{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle("L{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
 
         if ($isDupe) {
-            $sheet->getStyle("A{$rowNum}:N{$rowNum}")->getFill()
+            $sheet->getStyle("A{$rowNum}:O{$rowNum}")->getFill()
                 ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setARGB('FFFFFF00');
         }

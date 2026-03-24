@@ -275,7 +275,7 @@ function getFilteredSorted() {
     filtered = filtered.filter(vm => {
       const searchable = [
         vm.hostname, vm.dns_name, vm.operating_system, vm.power_state,
-        vm.customer_name, vm.customer_code, vm.pricing_class,
+        vm.customer_name, vm.customer_code, vm.cmdb_customer, vm.pricing_class,
         (vm.ip_addresses || []).map(stripCidr).join(', ')
       ].join(' ').toLowerCase();
       return searchable.includes(query);
@@ -346,6 +346,7 @@ function renderTable() {
     tr.innerHTML = `
       <td>${esc(vm.hostname)}</td>
       <td class="customer-cell">${customerCell}</td>
+      <td>${esc(vm.cmdb_customer || '')}</td>
       <td class="ip-cell">${esc(ips)}</td>
       <td class="os-cell">${esc(vm.operating_system || '')}</td>
       <td>${vm.vcpu ?? ''}</td>
