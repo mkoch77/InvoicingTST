@@ -171,14 +171,35 @@
             </div>
           </div>
         </div>
+
+        <div class="card-group" style="margin-top:2rem;">
+          <h2 class="card-group-title">Client Services</h2>
+          <div class="settings-section">
+            <h2>Gerätepreise</h2>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+              Monatlicher Preis pro Gerätekategorie.
+            </p>
+            <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+              <table>
+                <thead><tr><th>Kategorie</th><th>Preis (EUR)</th><th>Aktiv</th></tr></thead>
+                <tbody id="device-pricing-rows"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:1rem;">
+              <button class="btn" id="save-device-pricing-btn">Gerätepreise speichern</button>
+            </div>
+          </div>
+        </div>
       `;
 
       loadPricing();
       loadLicenseSkus();
+      loadDevicePricing();
 
       document.getElementById('save-factors-btn').addEventListener('click', saveFactors);
       document.getElementById('save-tiers-btn').addEventListener('click', saveTiers);
       document.getElementById('save-license-skus-btn').addEventListener('click', saveLicenseSkus);
+      document.getElementById('save-device-pricing-btn').addEventListener('click', saveDevicePricing);
     }
 
     async function loadPricing() {
@@ -317,6 +338,59 @@
       });
       const data = await res.json();
       showToast(res.ok ? 'Lizenzpreise gespeichert' : (data.error || 'Fehler'), res.ok ? 'success' : 'error');
+    }
+
+    // ── Gerätepreise ──
+    let devicePricingData = [];
+
+    async function loadDevicePricing() {
+      try {
+        const res = await fetch('/api/device-pricing.php');
+        devicePricingData = await res.json();
+        renderDevicePricing();
+      } catch (err) {
+        document.getElementById('device-pricing-rows').innerHTML = `<tr><td colspan="3">Fehler: ${e(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderDevicePricing() {
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      const tbody = document.getElementById('device-pricing-rows');
+      tbody.innerHTML = '';
+      devicePricingData.forEach(d => {
+        const tr = document.createElement('tr');
+        if (isAdmin) {
+          tr.innerHTML = `
+            <td><strong>${e(d.category_name)}</strong></td>
+            <td><input type="number" class="devprice" data-id="${d.id}" value="${d.price}" step="0.01" style="width:110px;" /></td>
+            <td><label class="toggle"><input type="checkbox" class="devactive" data-id="${d.id}" ${d.is_active ? 'checked' : ''} /><span class="slider"></span></label></td>
+          `;
+        } else {
+          tr.innerHTML = `
+            <td><strong>${e(d.category_name)}</strong></td>
+            <td>${Number(d.price).toLocaleString('de-DE', {minimumFractionDigits:2})} \u20AC</td>
+            <td>${d.is_active ? 'Ja' : 'Nein'}</td>
+          `;
+        }
+        tbody.appendChild(tr);
+      });
+      document.getElementById('save-device-pricing-btn').style.display = isAdmin ? '' : 'none';
+    }
+
+    async function saveDevicePricing() {
+      const tiers = [];
+      document.querySelectorAll('.devprice').forEach(inp => {
+        const id = parseInt(inp.dataset.id);
+        const active = document.querySelector(`.devactive[data-id="${id}"]`);
+        tiers.push({ id, price: parseFloat(inp.value), is_active: active ? active.checked : true });
+      });
+      const res = await fetch('/api/device-pricing.php', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tiers }),
+      });
+      const data = await res.json();
+      showToast(res.ok ? 'Gerätepreise gespeichert' : (data.error || 'Fehler'), res.ok ? 'success' : 'error');
     }
 
     // ── Kalkulator-Einstellungen ──

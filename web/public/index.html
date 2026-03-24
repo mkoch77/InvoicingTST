@@ -236,15 +236,31 @@
         container.innerHTML = '<div class="vm-stats-loading">Keine Gerätedaten vorhanden</div>';
         return;
       }
-      container.innerHTML = `
-        <div class="vm-stats-month">${formatMonth(d.month)}</div>
-        <div class="vm-stats-grid">
-          <div class="stat-row stat-total">
-            <span class="stat-label">${d.total} Geräte</span>
-            <span class="stat-value"></span>
-          </div>
-        </div>
-      `;
+      // Fetch billing total
+      fetch(`/api/billing-devices.php?month=${encodeURIComponent(d.month)}`)
+        .then(r => r.json())
+        .then(data => {
+          container.innerHTML = `
+            <div class="vm-stats-month">${formatMonth(d.month)}</div>
+            <div class="vm-stats-grid">
+              <div class="stat-row stat-total">
+                <span class="stat-label">${data.total_devices || d.total} Geräte</span>
+                <span class="stat-value">${data.total_price ? fmtEur(data.total_price) : ''}</span>
+              </div>
+            </div>
+          `;
+        })
+        .catch(() => {
+          container.innerHTML = `
+            <div class="vm-stats-month">${formatMonth(d.month)}</div>
+            <div class="vm-stats-grid">
+              <div class="stat-row stat-total">
+                <span class="stat-label">${d.total} Geräte</span>
+                <span class="stat-value"></span>
+              </div>
+            </div>
+          `;
+        });
     }
 
     function fmtEur(val) {

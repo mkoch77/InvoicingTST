@@ -9,6 +9,7 @@
 require_once __DIR__ . '/msgraph.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/logger.php';
+require_once __DIR__ . '/device_pricing.php';
 
 function syncIntuneDevices(string $username = 'system'): array
 {
@@ -35,9 +36,9 @@ function syncIntuneDevices(string $username = 'system'): array
     $stmt = $pdo->prepare("
         INSERT INTO intune_device (device_id, azure_ad_device_id, device_name, serial_number,
             manufacturer, model, user_display_name, user_principal_name, compliance_state,
-            last_sync, export_month, updated_at)
+            last_sync, export_month, device_category, device_price, updated_at)
         VALUES (:device_id, :azure_id, :name, :serial, :manufacturer, :model,
-            :user_name, :upn, :compliance, :last_sync, :month, NOW())
+            :user_name, :upn, :compliance, :last_sync, :month, :category, :price, NOW())
         ON CONFLICT (device_id) DO UPDATE SET
             azure_ad_device_id = EXCLUDED.azure_ad_device_id,
             device_name = EXCLUDED.device_name,
@@ -49,11 +50,15 @@ function syncIntuneDevices(string $username = 'system'): array
             compliance_state = EXCLUDED.compliance_state,
             last_sync = EXCLUDED.last_sync,
             export_month = EXCLUDED.export_month,
+            device_category = EXCLUDED.device_category,
+            device_price = EXCLUDED.device_price,
             updated_at = NOW()
     ");
 
+    $tiers = getDevicePricingTiers();
     $count = 0;
     foreach ($devices as $d) {
+        $pricing = classifyDevice($d['manufacturer'] ?? '', $d['model'] ?? '', $tiers);
         $stmt->execute([
             'device_id'    => $d['id'] ?? '',
             'azure_id'     => $d['azureADDeviceId'] ?? null,
@@ -66,6 +71,8 @@ function syncIntuneDevices(string $username = 'system'): array
             'compliance'   => $d['complianceState'] ?? null,
             'last_sync'    => $d['lastSyncDateTime'] ?? null,
             'month'        => $currentMonth,
+            'category'     => $pricing['category'] ?? null,
+            'price'        => $pricing['price'] ?? 0,
         ]);
         $count++;
     }

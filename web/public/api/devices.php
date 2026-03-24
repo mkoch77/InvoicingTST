@@ -74,7 +74,7 @@ if (!$month) {
 $stmt = $pdo->prepare("
     SELECT device_name, serial_number, manufacturer, model,
            user_display_name, user_principal_name, compliance_state,
-           last_sync, cost_center, company_name
+           last_sync, cost_center, company_name, device_category, device_price
     FROM intune_device
     WHERE export_month = :month
     ORDER BY user_display_name, device_name

@@ -23,6 +23,7 @@
   </div>
   <script src="/app.js?v=10"></script>
   <script>
+    function fmtEur(val){return Number(val).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20AC';}
     function esc(s){const d=document.createElement('div');d.textContent=s??'';return d.innerHTML;}
     function formatMonth(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(y,parseInt(mo)-1).toLocaleDateString('de-DE',{year:'numeric',month:'long'});}
     function fmtDate(v){if(!v)return'';return new Date(v).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
@@ -43,6 +44,7 @@
         summary.innerHTML=`<div class="billing-summary-card">
           <span class="billing-summary-label">${formatMonth(data.month)}</span>
           <span class="billing-summary-value">${data.total_devices} Geräte / ${data.total_users} Benutzer</span>
+          <span class="billing-summary-price">${fmtEur(data.total_price)}</span>
         </div>`;
 
         if(!data.companies||!data.companies.length){content.innerHTML='<div class="vm-stats-loading">Keine Gerätedaten.</div>';return;}
@@ -52,16 +54,16 @@
           html+=`<div class="billing-company collapsed">
             <div class="billing-company-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <div class="billing-company-info"><span class="billing-toggle">&#x25BC;</span><strong>${esc(company.company)}</strong>${company.address?`<span class="billing-address">${esc(company.address)}</span>`:''}</div>
-              <div class="billing-company-totals"><span class="billing-count">${company.total_users} Benutzer / ${company.total_devices} Geräte</span></div>
+              <div class="billing-company-totals"><span class="billing-count">${company.total_users} Benutzer / ${company.total_devices} Geräte</span><span class="billing-price">${fmtEur(company.total_price)}</span></div>
             </div><div class="billing-company-body">`;
 
           for(const cc of company.cost_centers){
             html+=`<div class="billing-cc collapsed">
               <div class="billing-cc-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <div class="billing-cc-info"><span class="billing-toggle">&#x25BC;</span><strong>KSt ${esc(cc.number)}</strong>${cc.bearer?`<span class="billing-bearer">${esc(cc.bearer)}</span>`:''}</div>
-                <div class="billing-cc-totals"><span class="billing-count">${cc.total_users} Benutzer / ${cc.total_devices} Geräte</span></div>
+                <div class="billing-cc-totals"><span class="billing-count">${cc.total_users} Benutzer / ${cc.total_devices} Geräte</span><span class="billing-price">${fmtEur(cc.total_price)}</span></div>
               </div><div class="billing-cc-body">
-                <table class="billing-table"><thead><tr><th>Benutzer</th><th>E-Mail</th><th>Gerätename</th><th>Hersteller</th><th>Modell</th><th>Seriennr.</th><th>Compliance</th></tr></thead><tbody>`;
+                <table class="billing-table"><thead><tr><th>Benutzer</th><th>E-Mail</th><th>Gerätename</th><th>Hersteller</th><th>Modell</th><th>Kategorie</th><th>Preis</th></tr></thead><tbody>`;
 
             for(const user of cc.users){
               for(let i=0;i<user.devices.length;i++){
@@ -70,18 +72,18 @@
                 html+=`<tr>
                   ${i===0?`<td rowspan="${user.devices.length}">${esc(user.display_name)}</td><td rowspan="${user.devices.length}" style="font-size:.85rem">${esc(user.upn)}</td>`:''}
                   <td>${esc(dev.name)}</td><td>${esc(dev.manufacturer||'')}</td><td>${esc(dev.model||'')}</td>
-                  <td>${esc(dev.serial||'')}</td><td style="${compColor}">${esc(dev.compliance||'')}</td>
+                  <td>${esc(dev.category||'')}</td><td class="num">${fmtEur(dev.price||0)}</td>
                 </tr>`;
               }
             }
 
-            html+=`</tbody><tfoot><tr class="billing-subtotal"><td colspan="7"><strong>Summe KSt ${esc(cc.number)}: ${cc.total_users} Benutzer / ${cc.total_devices} Geräte</strong></td></tr></tfoot></table></div></div>`;
+            html+=`</tbody><tfoot><tr class="billing-subtotal"><td colspan="6"><strong>Summe KSt ${esc(cc.number)}: ${cc.total_users} Benutzer / ${cc.total_devices} Geräte</strong></td><td class="num"><strong>${fmtEur(cc.total_price)}</strong></td></tr></tfoot></table></div></div>`;
           }
 
-          html+=`<div class="billing-company-subtotal"><strong>Summe ${esc(company.company)}</strong><strong>${company.total_users} Benutzer / ${company.total_devices} Geräte</strong></div></div></div>`;
+          html+=`<div class="billing-company-subtotal"><strong>Summe ${esc(company.company)}</strong><strong>${fmtEur(company.total_price)}</strong></div></div></div>`;
         }
 
-        html+=`<div class="billing-grand-total"><strong>Gesamtsumme</strong><span>${data.total_users} Benutzer / ${data.total_devices} Geräte</span></div>`;
+        html+=`<div class="billing-grand-total"><strong>Gesamtsumme</strong><span>${data.total_users} Benutzer / ${data.total_devices} Geräte</span><strong>${fmtEur(data.total_price)}</strong></div>`;
         content.innerHTML=html;
       }catch(err){content.innerHTML=`<div class="vm-stats-loading">Fehler: ${esc(err.message)}</div>`;}
     }

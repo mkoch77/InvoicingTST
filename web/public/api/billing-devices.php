@@ -21,7 +21,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT device_name, serial_number, manufacturer, model,
                user_display_name, user_principal_name, compliance_state,
-               last_sync, cost_center, company_name
+               last_sync, cost_center, company_name, device_category, device_price
         FROM intune_device
         WHERE export_month = :month
         ORDER BY company_name, cost_center, user_display_name, device_name
@@ -40,11 +40,13 @@ try {
     // Group: company → cost_center → user → devices
     $companies = [];
     $totalDevices = 0;
+    $totalPrice = 0.0;
 
     foreach ($rows as $row) {
         $companyName = $row['company_name'] ?: 'Unbekannt';
         $ccNumber = $row['cost_center'] ?: 'Nicht zugeordnet';
         $upn = $row['user_principal_name'] ?: 'Kein Benutzer';
+        $price = (float) ($row['device_price'] ?? 0);
 
         if (!isset($companies[$companyName])) {
             $companyAddr = '';
@@ -60,6 +62,7 @@ try {
                 'cost_centers' => [],
                 'total_devices' => 0,
                 'total_users' => 0,
+                'total_price' => 0.0,
             ];
         }
 
@@ -70,6 +73,7 @@ try {
                 'bearer' => $ci['cost_bearer'] ?? '',
                 'users' => [],
                 'total_devices' => 0,
+                'total_price' => 0.0,
             ];
         }
 
@@ -78,6 +82,7 @@ try {
                 'display_name' => $row['user_display_name'] ?: $upn,
                 'upn' => $upn,
                 'devices' => [],
+                'total_price' => 0.0,
             ];
         }
 
@@ -86,13 +91,19 @@ try {
             'serial' => $row['serial_number'],
             'manufacturer' => $row['manufacturer'],
             'model' => $row['model'],
+            'category' => $row['device_category'],
+            'price' => $price,
             'compliance' => $row['compliance_state'],
             'last_sync' => $row['last_sync'],
         ];
 
+        $companies[$companyName]['cost_centers'][$ccNumber]['users'][$upn]['total_price'] += $price;
         $companies[$companyName]['cost_centers'][$ccNumber]['total_devices']++;
+        $companies[$companyName]['cost_centers'][$ccNumber]['total_price'] += $price;
         $companies[$companyName]['total_devices']++;
+        $companies[$companyName]['total_price'] += $price;
         $totalDevices++;
+        $totalPrice += $price;
     }
 
     // Sort and convert to arrays
@@ -120,6 +131,7 @@ try {
         'companies' => array_values($companies),
         'total_devices' => $totalDevices,
         'total_users' => $totalUsers,
+        'total_price' => round($totalPrice, 2),
     ]);
 } catch (Exception $e) {
     http_response_code(500);

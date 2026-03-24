@@ -29,9 +29,9 @@
       <table>
         <thead><tr>
           <th>Gerätename</th><th>Benutzer</th><th>E-Mail</th><th>Hersteller</th>
-          <th>Modell</th><th>Seriennr.</th><th>Compliance</th><th>Firma</th><th>KSt</th><th>Letzter Sync</th>
+          <th>Modell</th><th>Kategorie</th><th>Preis</th><th>Seriennr.</th><th>Compliance</th><th>Firma</th><th>KSt</th><th>Letzter Sync</th>
         </tr></thead>
-        <tbody id="device-rows"><tr><td colspan="10" class="empty">Daten werden geladen…</td></tr></tbody>
+        <tbody id="device-rows"><tr><td colspan="12" class="empty">Daten werden geladen…</td></tr></tbody>
       </table>
     </div>
     <div id="pagination" class="pagination"></div>
@@ -50,7 +50,7 @@
       sel.innerHTML = '';
       for (const m of months.slice(0,6)) { const o=document.createElement('option'); o.value=m; o.textContent=formatMonth(m); sel.appendChild(o); }
       if (months.length) { currentMonth=months[0]; loadDevices(currentMonth); }
-      else document.getElementById('device-rows').innerHTML='<tr><td colspan="10" class="empty">Keine Daten. "Intune Sync" ausführen.</td></tr>';
+      else document.getElementById('device-rows').innerHTML='<tr><td colspan="12" class="empty">Keine Daten. "Intune Sync" ausführen.</td></tr>';
     }
 
     async function loadDevices(month) {
@@ -65,7 +65,7 @@
       const q = document.getElementById('search-input').value.toLowerCase();
       return allDevices.filter(d => {
         if (!q) return true;
-        return [d.device_name,d.user_display_name,d.user_principal_name,d.manufacturer,d.model,d.serial_number,d.company_name,d.cost_center].join(' ').toLowerCase().includes(q);
+        return [d.device_name,d.user_display_name,d.user_principal_name,d.manufacturer,d.model,d.device_category,d.serial_number,d.company_name,d.cost_center].join(' ').toLowerCase().includes(q);
       });
     }
 
@@ -80,12 +80,12 @@
       const page=filtered.slice(start,start+pageSize);
       document.getElementById('device-count').textContent=`${filtered.length} Geräte`;
       tbody.innerHTML='';
-      if (!page.length) { tbody.innerHTML='<tr><td colspan="10" class="empty">Keine Ergebnisse</td></tr>'; }
+      if (!page.length) { tbody.innerHTML='<tr><td colspan="12" class="empty">Keine Ergebnisse</td></tr>'; }
       for (const d of page) {
         const compColor = d.compliance_state==='compliant'?'state-on':d.compliance_state==='noncompliant'?'state-off':'';
         const tr=document.createElement('tr');
         tr.innerHTML=`<td>${esc(d.device_name)}</td><td>${esc(d.user_display_name||'')}</td><td style="font-size:.85rem">${esc(d.user_principal_name||'')}</td>
-          <td>${esc(d.manufacturer||'')}</td><td>${esc(d.model||'')}</td><td>${esc(d.serial_number||'')}</td>
+          <td>${esc(d.manufacturer||'')}</td><td>${esc(d.model||'')}</td><td>${esc(d.device_category||'')}</td><td class="num">${d.device_price?Number(d.device_price).toLocaleString('de-DE',{minimumFractionDigits:2})+' \u20AC':''}</td><td>${esc(d.serial_number||'')}</td>
           <td class="${compColor}">${esc(d.compliance_state||'')}</td><td>${esc(d.company_name||'')}</td><td>${esc(d.cost_center||'')}</td><td style="font-size:.85rem">${fmtDate(d.last_sync)}</td>`;
         tbody.appendChild(tr);
       }
