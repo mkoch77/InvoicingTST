@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_skus') {
         requireRole('admin');
+        $pdo = getDb();
         $skus = $input['skus'] ?? [];
         $stmt = $pdo->prepare("UPDATE license_sku SET price = :price, is_active = :active WHERE id = :id");
         foreach ($skus as $s) {
