@@ -67,7 +67,7 @@
         const sel = document.getElementById('month-select');
         if (sel.options.length <= 1 && data.months) {
           sel.innerHTML = '';
-          for (const m of data.months) {
+          for (const m of data.months.slice(0, 6)) {
             const opt = document.createElement('option');
             opt.value = m;
             opt.textContent = formatMonth(m);
