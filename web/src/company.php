@@ -127,16 +127,10 @@ function syncCompanyStructure(string $username = 'system'): array
         $synced++;
     }
 
-    // 3. Build CostCenter → Customer lookup from synced data
-    $ccCustomerMap = [];
-    $ccRows = $pdo->query("SELECT name, customer FROM cost_center WHERE customer IS NOT NULL AND customer != ''")->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($ccRows as $r) {
-        $ccCustomerMap[$r['name']] = $r['customer'];
-    }
-
-    // 4. Sync Server → IT-Service mapping (with CMDB customer)
+    // 3. Sync Server → IT-Service mapping (with CMDB customer)
     $SERVER_NAME = '1964';
     $SERVER_IT_SERVICE = '2613';
+    $SERVER_CUSTOMER = '2214';
 
     $serverObjects = $client->searchAllObjects('objectType = "Server" AND objectSchemaId = 8 AND Status = "Active"');
     AppLogger::info('company-sync', "Fetched " . count($serverObjects) . " active Server objects", [], $username);
@@ -156,14 +150,12 @@ function syncCompanyStructure(string $username = 'system'): array
         $key = $obj['objectKey'] ?? '';
         $name = $getAttr($obj['attributes'] ?? [], $SERVER_NAME);
         $itService = $getAttr($obj['attributes'] ?? [], $SERVER_IT_SERVICE);
+        $cmdbCustomer = $getAttr($obj['attributes'] ?? [], $SERVER_CUSTOMER) ?: null;
 
         if (!$name || !$itService) continue;
 
         // Extract hostname (first part before domain)
         $hostname = strtoupper(explode('.', $name)[0]);
-
-        // Resolve customer: IT-Service name → CostCenter → Customer
-        $cmdbCustomer = $ccCustomerMap[$itService] ?? null;
 
         $ssmStmt->execute([
             'hostname' => $hostname,
