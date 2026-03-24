@@ -119,15 +119,20 @@ try {
         ],
         'licenses'      => $licStats,
         'devices'       => (function() use ($pdo) {
-            $devMonth = $pdo->query("SELECT MAX(export_month) FROM intune_device")->fetchColumn() ?: '';
-            $stats = ['month' => $devMonth, 'total' => 0, 'by_manufacturer' => []];
-            if ($devMonth) {
-                $s = $pdo->prepare("SELECT COUNT(*) FROM intune_device WHERE export_month = :m");
-                $s->execute(['m' => $devMonth]);
-                $stats['total'] = (int) $s->fetchColumn();
-                $s = $pdo->prepare("SELECT COALESCE(manufacturer,'Unbekannt') AS name, COUNT(*) AS count FROM intune_device WHERE export_month = :m GROUP BY manufacturer ORDER BY count DESC");
-                $s->execute(['m' => $devMonth]);
-                $stats['by_manufacturer'] = $s->fetchAll(\PDO::FETCH_ASSOC);
+            $stats = ['month' => '', 'total' => 0, 'by_manufacturer' => []];
+            try {
+                $devMonth = $pdo->query("SELECT MAX(export_month) FROM intune_device")->fetchColumn() ?: '';
+                $stats['month'] = $devMonth;
+                if ($devMonth) {
+                    $s = $pdo->prepare("SELECT COUNT(*) FROM intune_device WHERE export_month = :m");
+                    $s->execute(['m' => $devMonth]);
+                    $stats['total'] = (int) $s->fetchColumn();
+                    $s = $pdo->prepare("SELECT COALESCE(manufacturer,'Unbekannt') AS name, COUNT(*) AS count FROM intune_device WHERE export_month = :m GROUP BY manufacturer ORDER BY count DESC");
+                    $s->execute(['m' => $devMonth]);
+                    $stats['by_manufacturer'] = $s->fetchAll(\PDO::FETCH_ASSOC);
+                }
+            } catch (\Exception $e) {
+                // Table may not exist yet
             }
             return $stats;
         })(),
