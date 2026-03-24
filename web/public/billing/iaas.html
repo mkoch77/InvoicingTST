@@ -141,11 +141,13 @@
             `;
 
             for (const srv of cc.servers) {
-              const stateClass = srv.power_state === 'On' ? 'state-on' :
-                                 srv.power_state === 'Off' ? 'state-off' : '';
+              const stateColor = srv.power_state === 'On' ? '#4ade80' :
+                                  srv.power_state === 'Off' ? '#f87171' :
+                                  srv.power_state === 'Suspended' ? '#facc15' : '#888';
+              const stateTitle = srv.power_state || 'Unknown';
               html += `
                       <tr>
-                        <td>${esc(srv.hostname)}</td>
+                        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${stateColor};margin-right:6px;vertical-align:middle;" title="${stateTitle}"></span>${esc(srv.hostname)}</td>
                         <td>${esc(srv.cmdb_customer || '')}</td>
                         <td>${srv.vcpu}</td>
                         <td>${srv.vram_mb}</td>
