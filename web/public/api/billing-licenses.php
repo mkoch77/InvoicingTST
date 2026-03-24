@@ -50,7 +50,9 @@ try {
     $totalAssignments = 0;
 
     foreach ($rows as $row) {
-        $companyName = $row['company_name'] ?: 'Unbekannt';
+        // Resolve company ONLY from Firmenstruktur (cost_center → company)
+        $companyName = (isset($ccAddresses[$ccNumber]) && $ccAddresses[$ccNumber]['company_name'])
+            ? $ccAddresses[$ccNumber]['company_name'] : 'Nicht zugeordnet';
         $ccNumber = $row['cost_center'] ?: 'Nicht zugeordnet';
         $upn = $row['user_principal_name'];
         $price = (float) $row['price'];

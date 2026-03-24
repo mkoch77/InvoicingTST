@@ -2,6 +2,7 @@
 /**
  * Billing Overview API — all costs grouped by company → cost center.
  * Aggregates: IaaS VMs, Microsoft 365 Licenses, Client Devices.
+ * Company is resolved via cost_center → company table (Firmenstruktur).
  *
  * GET /api/billing-overview.php?month=YYYY-MM
  * GET /api/billing-overview.php?month=YYYY-MM&company=FirmaName
@@ -31,6 +32,28 @@ try {
     $filterCompany = $_GET['company'] ?? '';
     $filterCC = $_GET['cost_center'] ?? '';
 
+    // ── Build cost_center → company lookup from Firmenstruktur ──
+    $ccToCompany = [];
+    $ccRows = $pdo->query("
+        SELECT cc.name AS cc_name, cc.cost_bearer, co.name AS company_name
+        FROM cost_center cc
+        LEFT JOIN company co ON co.id = cc.company_id
+    ")->fetchAll(\PDO::FETCH_ASSOC);
+    foreach ($ccRows as $r) {
+        $ccToCompany[$r['cc_name']] = [
+            'company' => $r['company_name'] ?: 'Unbekannt',
+            'bearer'  => $r['cost_bearer'] ?? '',
+        ];
+    }
+
+    // Helper: resolve company ONLY from Firmenstruktur (cost_center → company)
+    $resolveCompany = function(string $costCenter) use ($ccToCompany): string {
+        if ($costCenter && $costCenter !== 'Nicht zugeordnet' && isset($ccToCompany[$costCenter])) {
+            return $ccToCompany[$costCenter]['company'] ?: 'Nicht zugeordnet';
+        }
+        return 'Nicht zugeordnet';
+    };
+
     // ── 1. IaaS Server costs ──
     $iaasHostnames = [];
     try {
@@ -40,23 +63,23 @@ try {
 
     $vmStmt = $pdo->prepare("
         SELECT v.hostname, v.vcpu, v.vram_mb, v.provisioned_storage_gb,
-               ssm.cost_center_number AS cost_center, ssm.cmdb_customer AS company_name
+               ssm.cost_center_number AS cost_center
         FROM vm v
         LEFT JOIN server_service_mapping ssm ON UPPER(ssm.hostname) = UPPER(v.hostname)
         WHERE v.exported_at >= :start::DATE AND v.exported_at < (:start::DATE + INTERVAL '1 month')
     ");
     $vmStmt->execute(['start' => $month . '-01']);
-    $vmRows = $vmStmt->fetchAll(\PDO::FETCH_ASSOC);
 
     $iaasItems = [];
-    foreach ($vmRows as $vm) {
+    foreach ($vmStmt->fetchAll(\PDO::FETCH_ASSOC) as $vm) {
         $hn = strtoupper($vm['hostname']);
         if (!isset($iaasHostnames[$hn])) continue;
         enrichVmWithPricing($vm);
         if (($vm['price'] ?? 0) <= 0) continue;
+        $cc = $vm['cost_center'] ?: 'Nicht zugeordnet';
         $iaasItems[] = [
-            'company' => $vm['company_name'] ?: 'Unbekannt',
-            'cost_center' => $vm['cost_center'] ?: 'Nicht zugeordnet',
+            'company' => $resolveCompany($cc),
+            'cost_center' => $cc,
             'description' => $vm['hostname'],
             'service' => 'IaaS Server Hosting',
             'detail' => $vm['pricing_class'] ?? '',
@@ -66,7 +89,7 @@ try {
 
     // ── 2. License costs ──
     $licStmt = $pdo->prepare("
-        SELECT eu.company_name, eu.cost_center, eu.display_name, ls.display_name AS license_name, ls.price
+        SELECT eu.cost_center, eu.display_name, ls.display_name AS license_name, ls.price
         FROM entra_license_assignment ela
         JOIN entra_user eu ON eu.id = ela.entra_user_id
         JOIN license_sku ls ON ls.id = ela.license_sku_id AND ls.is_active = TRUE
@@ -75,9 +98,10 @@ try {
     $licStmt->execute(['month' => $month]);
     $licItems = [];
     foreach ($licStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+        $cc = $row['cost_center'] ?: 'Nicht zugeordnet';
         $licItems[] = [
-            'company' => $row['company_name'] ?: 'Unbekannt',
-            'cost_center' => $row['cost_center'] ?: 'Nicht zugeordnet',
+            'company' => $resolveCompany($cc),
+            'cost_center' => $cc,
             'description' => $row['display_name'],
             'service' => 'Microsoft 365 Lizenzen',
             'detail' => $row['license_name'],
@@ -87,16 +111,17 @@ try {
 
     // ── 3. Device costs ──
     $devStmt = $pdo->prepare("
-        SELECT company_name, cost_center, user_display_name, device_name, device_category, device_price
+        SELECT cost_center, user_display_name, device_name, device_category, device_price
         FROM intune_device
         WHERE export_month = :month AND device_price > 0
     ");
     $devStmt->execute(['month' => $month]);
     $devItems = [];
     foreach ($devStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+        $cc = $row['cost_center'] ?: 'Nicht zugeordnet';
         $devItems[] = [
-            'company' => $row['company_name'] ?: 'Unbekannt',
-            'cost_center' => $row['cost_center'] ?: 'Nicht zugeordnet',
+            'company' => $resolveCompany($cc),
+            'cost_center' => $cc,
             'description' => $row['device_name'] . ($row['user_display_name'] ? " ({$row['user_display_name']})" : ''),
             'service' => 'Client Services',
             'detail' => $row['device_category'] ?? '',
@@ -128,7 +153,8 @@ try {
             $companies[$co] = ['company' => $co, 'cost_centers' => [], 'total_price' => 0.0];
         }
         if (!isset($companies[$co]['cost_centers'][$cc])) {
-            $companies[$co]['cost_centers'][$cc] = ['number' => $cc, 'services' => [], 'total_price' => 0.0];
+            $bearer = $ccToCompany[$cc]['bearer'] ?? '';
+            $companies[$co]['cost_centers'][$cc] = ['number' => $cc, 'bearer' => $bearer, 'services' => [], 'total_price' => 0.0];
         }
         if (!isset($companies[$co]['cost_centers'][$cc]['services'][$svc])) {
             $companies[$co]['cost_centers'][$cc]['services'][$svc] = ['service' => $svc, 'items' => [], 'total_price' => 0.0, 'count' => 0];
@@ -153,10 +179,11 @@ try {
         $co['cost_centers'] = array_values($co['cost_centers']);
     }
 
-    // Collect filter options
-    $allCompanies = array_unique(array_map(fn($i) => $i['company'], array_merge($iaasItems, $licItems, $devItems)));
+    // Collect filter options (from unfiltered data)
+    $unfilteredAll = array_merge($iaasItems, $licItems, $devItems);
+    $allCompanies = array_unique(array_map(fn($i) => $i['company'], $unfilteredAll));
     sort($allCompanies);
-    $allCostCenters = array_unique(array_map(fn($i) => $i['cost_center'], array_merge($iaasItems, $licItems, $devItems)));
+    $allCostCenters = array_unique(array_map(fn($i) => $i['cost_center'], $unfilteredAll));
     sort($allCostCenters);
 
     echo json_encode([

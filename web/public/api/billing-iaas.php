@@ -60,7 +60,7 @@ try {
 
         $ccNumber = $hostnameToCc[$hostname] ?? 'Nicht zugeordnet';
         $ccInfo = $ccToCompany[$ccNumber] ?? null;
-        $companyName = $ccInfo['company_name'] ?? 'Unbekannt';
+        $companyName = (!empty($ccInfo['company_name'])) ? $ccInfo['company_name'] : 'Nicht zugeordnet';
         $companyAddress = $ccInfo['company_address'] ?? '';
         $ccBearer = $ccInfo['cost_bearer'] ?? '';
 
