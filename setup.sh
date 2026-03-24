@@ -277,7 +277,82 @@ setup_jira() {
 }
 
 # ==============================================================================
-# 9. Status-Uebersicht
+# 9. Microsoft Entra ID einrichten (optional)
+# ==============================================================================
+setup_entra() {
+    echo ""
+    read -rp "Microsoft Entra ID (Lizenz-Sync) einrichten? (j/n) [n]: " do_entra
+    if [ "${do_entra:-n}" != "j" ]; then
+        info "Entra-Setup uebersprungen. Spaeter im Vault konfigurieren."
+        return
+    fi
+
+    echo ""
+    info "Microsoft Entra ID Konfiguration"
+    info "Benoetigt: App Registration mit Application Permissions:"
+    info "  User.Read.All, Directory.Read.All"
+    echo ""
+
+    read -rp "Tenant ID: " ENTRA_TENANT
+    read -rp "Client ID: " ENTRA_CLIENT
+    read -rsp "Client Secret: " ENTRA_SECRET
+    echo ""
+
+    if [ -z "$ENTRA_TENANT" ] || [ -z "$ENTRA_CLIENT" ] || [ -z "$ENTRA_SECRET" ]; then
+        warn "Unvollstaendige Eingabe. Entra-Setup uebersprungen."
+        return
+    fi
+
+    # Login am Accounting-System
+    local cookie
+    cookie=$(mktemp)
+    curl -sk -c "$cookie" -X POST "https://localhost/api/auth/login.php" \
+        -H "Content-Type: application/json" \
+        -d '{"username":"admin","password":"admin"}' >/dev/null 2>&1
+
+    # Vault-Eintraege speichern
+    for entry in "entra_tenant_id:$ENTRA_TENANT:Microsoft Entra ID Tenant ID" \
+                 "entra_client_id:$ENTRA_CLIENT:Microsoft Entra ID App Client ID" \
+                 "entra_client_secret:$ENTRA_SECRET:Microsoft Entra ID App Client Secret"; do
+        IFS=':' read -r key val desc <<< "$entry"
+        local payload
+        payload=$(python3 -c "
+import json, sys
+print(json.dumps({'key_name': sys.argv[1], 'value': sys.argv[2], 'description': sys.argv[3]}))" \
+            "$key" "$val" "$desc")
+        curl -sk -b "$cookie" -X POST "https://localhost/api/vault.php" \
+            -H "Content-Type: application/json" -d "$payload" >/dev/null 2>&1
+    done
+
+    rm -f "$cookie"
+    ok "Entra ID Credentials im Vault gespeichert."
+
+    # Verbindung testen
+    info "Teste Entra-Verbindung..."
+    local test_cookie
+    test_cookie=$(mktemp)
+    curl -sk -c "$test_cookie" -X POST "https://localhost/api/auth/login.php" \
+        -H "Content-Type: application/json" \
+        -d '{"username":"admin","password":"admin"}' >/dev/null 2>&1
+
+    local sync_result
+    sync_result=$(curl -sk -b "$test_cookie" -X POST "https://localhost/api/licenses.php" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"sync"}' 2>/dev/null)
+    rm -f "$test_cookie"
+
+    if echo "$sync_result" | grep -q '"message"'; then
+        local msg
+        msg=$(echo "$sync_result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))" 2>/dev/null)
+        ok "Entra Sync erfolgreich: $msg"
+    else
+        warn "Entra Sync fehlgeschlagen. Bitte Credentials pruefen."
+        echo "$sync_result" | python3 -m json.tool 2>/dev/null || echo "$sync_result"
+    fi
+}
+
+# ==============================================================================
+# 10. Status-Uebersicht
 # ==============================================================================
 show_status() {
     echo ""
@@ -351,6 +426,7 @@ case "$MODE" in
         setup_runtime_secrets
         setup_admin
         setup_jira
+        setup_entra
         show_status
         ;;
 

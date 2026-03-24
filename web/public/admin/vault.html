@@ -71,8 +71,11 @@
 
     // Vordefinierte Secrets die immer angezeigt werden
     const requiredSecrets = [
-      { key_name: 'jira_api_token',              description: 'Service Account Scoped API-Token (Bearer)' },
-      { key_name: 'jira_workspace_id',           description: 'Assets Workspace-ID (GET /rest/servicedeskapi/assets/workspace)' },
+      { key_name: 'jira_api_token',              description: 'Jira Assets: Service Account Scoped API-Token (Bearer)' },
+      { key_name: 'jira_workspace_id',           description: 'Jira Assets: Workspace-ID' },
+      { key_name: 'entra_tenant_id',             description: 'Microsoft Entra ID: Azure AD Tenant ID' },
+      { key_name: 'entra_client_id',             description: 'Microsoft Entra ID: App Registration Client ID' },
+      { key_name: 'entra_client_secret',         description: 'Microsoft Entra ID: App Registration Client Secret' },
       { key_name: 'backup_encryption_key',       description: 'AES-256 Schlüssel für Backup-Verschlüsselung' },
       { key_name: 'backup_remote_credentials',   description: 'Remote-Backup Zugangsdaten (JSON: {"user":"...","password":"..."})' },
     ];
