@@ -9,6 +9,9 @@ RewriteRule ^stammdaten/?$ /stammdaten/index.html [QSA,L]
 # /admin/ → Administration index (tabs)
 RewriteRule ^admin/?$ /admin/index.html [QSA,L]
 
+# /billing/ → Gesamtabrechnung
+RewriteRule ^billing/?$ /billing/index.html [QSA,L]
+
 # Root → Kundenportal
 RewriteCond %{REQUEST_URI} ^/$
 RewriteRule ^$ /customer/index.html [L]
