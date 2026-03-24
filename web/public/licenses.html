@@ -157,18 +157,55 @@
       }
 
       // Pagination
-      const pag = document.getElementById('pagination');
-      if (totalPages <= 1) { pag.innerHTML = ''; return; }
-      let html = '';
-      if (currentPage > 1) html += `<button onclick="goPage(${currentPage-1})">&laquo;</button>`;
-      for (let p = Math.max(1, currentPage-2); p <= Math.min(totalPages, currentPage+2); p++) {
-        html += `<button class="${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
-      }
-      if (currentPage < totalPages) html += `<button onclick="goPage(${currentPage+1})">&raquo;</button>`;
-      pag.innerHTML = html;
+      renderPagination(totalPages);
     }
 
-    function goPage(p) { currentPage = p; renderTable(); }
+    function renderPagination(totalPages) {
+      const pag = document.getElementById('pagination');
+      pag.innerHTML = '';
+      if (totalPages <= 1) return;
+
+      const addBtn = (label, page, disabled, active) => {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.className = 'page-btn' + (active ? ' active' : '');
+        btn.disabled = disabled;
+        if (!disabled && !active) btn.addEventListener('click', () => { currentPage = page; renderTable(); });
+        pag.appendChild(btn);
+      };
+
+      addBtn('\u00AB', 1, currentPage === 1, false);
+      addBtn('\u2039', currentPage - 1, currentPage === 1, false);
+
+      const maxV = 7;
+      let pages = [];
+      if (totalPages <= maxV) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        let rs = Math.max(2, currentPage - 2), re = Math.min(totalPages - 1, currentPage + 2);
+        if (currentPage <= 3) re = Math.min(totalPages - 1, 5);
+        if (currentPage >= totalPages - 2) rs = Math.max(2, totalPages - 4);
+        if (rs > 2) pages.push('...');
+        for (let i = rs; i <= re; i++) pages.push(i);
+        if (re < totalPages - 1) pages.push('...');
+        pages.push(totalPages);
+      }
+
+      for (const p of pages) {
+        if (p === '...') {
+          const s = document.createElement('span');
+          s.className = 'page-ellipsis';
+          s.textContent = '...';
+          pag.appendChild(s);
+        } else {
+          addBtn(String(p), p, false, p === currentPage);
+        }
+      }
+
+      addBtn('\u203A', currentPage + 1, currentPage === totalPages, false);
+      addBtn('\u00BB', totalPages, currentPage === totalPages, false);
+    }
 
     document.getElementById('month-select').addEventListener('change', e => {
       currentMonth = e.target.value;

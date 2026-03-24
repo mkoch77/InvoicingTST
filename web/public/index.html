@@ -143,17 +143,25 @@
         return;
       }
 
+      let skuRows = '';
+      for (const sku of (l.by_sku || [])) {
+        skuRows += `
+          <a href="/licenses.html" class="stat-row">
+            <span class="stat-label">${sku.name}</span>
+            <span class="stat-value">${sku.count}</span>
+          </a>
+        `;
+      }
+
       container.innerHTML = `
         <div class="vm-stats-month">${formatMonth(l.month)}</div>
         <div class="vm-stats-grid">
-          <div class="stat-row stat-total">
-            <span class="stat-label">Lizenzzuweisungen</span>
+          ${skuRows}
+          <div class="stat-divider"></div>
+          <a href="/licenses.html" class="stat-row stat-total">
+            <span class="stat-label">Gesamt</span>
             <span class="stat-value">${l.total_users}</span>
-          </div>
-          <div class="stat-row stat-muted">
-            <span class="stat-label">Lizenztypen</span>
-            <span class="stat-value">${l.sku_count}</span>
-          </div>
+          </a>
         </div>
       `;
     }
