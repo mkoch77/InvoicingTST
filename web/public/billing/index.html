@@ -145,14 +145,15 @@
               const color = serviceColors[svc.service] || '#888';
               const icon = serviceIcons[svc.service] || '&#x1F4E6;';
               html += `
-                <div class="billing-service-block">
-                  <div class="billing-service-header">
+                <div class="billing-service-block collapsed">
+                  <div class="billing-service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                    <span class="billing-toggle">&#x25BC;</span>
                     <span style="color:${color}">${icon}</span>
                     <strong>${esc(svc.service)}</strong>
                     <span class="billing-count">${svc.count} Positionen</span>
                     <span class="billing-price">${fmtEur(svc.total_price)}</span>
                   </div>
-                  <table class="billing-table">
+                  <table class="billing-table billing-service-body">
                     <thead><tr><th>Beschreibung</th><th>Detail</th><th>Preis</th></tr></thead>
                     <tbody>
               `;
@@ -210,10 +211,10 @@
     document.getElementById('company-select').addEventListener('change', loadBilling);
     document.getElementById('cc-select').addEventListener('change', loadBilling);
     document.getElementById('expand-all-btn').addEventListener('click', () => {
-      document.querySelectorAll('.billing-company,.billing-cc').forEach(el => el.classList.remove('collapsed'));
+      document.querySelectorAll('.billing-company,.billing-cc,.billing-service-block').forEach(el => el.classList.remove('collapsed'));
     });
     document.getElementById('collapse-all-btn').addEventListener('click', () => {
-      document.querySelectorAll('.billing-company,.billing-cc').forEach(el => el.classList.add('collapsed'));
+      document.querySelectorAll('.billing-company,.billing-cc,.billing-service-block').forEach(el => el.classList.add('collapsed'));
     });
 
     loadBilling();
@@ -224,10 +225,13 @@
     .billing-service-header {
       display: flex; align-items: center; gap: 0.6rem;
       padding: 0.5rem 0.6rem; background: rgba(255,255,255,0.02);
-      border-radius: 4px; margin-bottom: 0.3rem;
+      border-radius: 4px; cursor: pointer; user-select: none;
     }
+    .billing-service-header:hover { background: rgba(255,255,255,0.05); }
     .billing-service-header .billing-price { margin-left: auto; font-weight: 600; }
     .billing-service-header .billing-count { color: var(--text-muted); font-size: 0.85rem; }
+    .billing-service-block.collapsed .billing-service-body { display: none; }
+    .billing-service-block.collapsed .billing-toggle { transform: rotate(-90deg); }
   </style>
 </body>
 </html>
