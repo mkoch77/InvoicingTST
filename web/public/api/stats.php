@@ -72,6 +72,37 @@ try {
         return ($tierOrder[$a] ?? 999) - ($tierOrder[$b] ?? 999);
     });
 
+    // License stats
+    $licMonth = $pdo->query("SELECT MAX(export_month) FROM entra_license_assignment")->fetchColumn() ?: '';
+    $licStats = ['month' => $licMonth, 'total_users' => 0, 'total_price' => 0.0, 'sku_count' => 0];
+    if ($licMonth) {
+        $licStmt = $pdo->prepare("
+            SELECT COUNT(ela.id) AS cnt, SUM(ls.price) AS price_sum, COUNT(DISTINCT ls.id) AS sku_cnt
+            FROM entra_license_assignment ela
+            JOIN license_sku ls ON ls.id = ela.license_sku_id
+            WHERE ela.export_month = :m
+        ");
+        $licStmt->execute(['m' => $licMonth]);
+        $lr = $licStmt->fetch();
+        $licStats['total_users'] = (int) ($lr['cnt'] ?? 0);
+        $licStats['sku_count']   = (int) ($lr['sku_cnt'] ?? 0);
+
+        // Calculate total price (users × per-license price)
+        $lpStmt = $pdo->prepare("
+            SELECT ls.price, COUNT(ela.id) AS cnt
+            FROM entra_license_assignment ela
+            JOIN license_sku ls ON ls.id = ela.license_sku_id
+            WHERE ela.export_month = :m
+            GROUP BY ls.id, ls.price
+        ");
+        $lpStmt->execute(['m' => $licMonth]);
+        $licTotal = 0.0;
+        foreach ($lpStmt->fetchAll() as $lp) {
+            $licTotal += (float) $lp['price'] * (int) $lp['cnt'];
+        }
+        $licStats['total_price'] = round($licTotal, 2);
+    }
+
     echo json_encode([
         'month'         => $month,
         'total'         => $total,
@@ -85,6 +116,7 @@ try {
             'total_price'  => round($totalPrice, 2),
             'vm_count'     => array_sum(array_column($classCounts, 'count')),
         ],
+        'licenses'      => $licStats,
     ]);
 } catch (Exception $e) {
     http_response_code(500);

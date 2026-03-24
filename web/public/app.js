@@ -75,8 +75,11 @@ function buildSidebar() {
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Abrechnung</div>
-        <a href="/billing/iaas.html" class="sidebar-link ${path.startsWith('/billing') ? 'active' : ''}">
+        <a href="/billing/iaas.html" class="sidebar-link ${path === '/billing/iaas.html' ? 'active' : ''}">
           <span class="icon">&#x1F4B0;</span><span class="label">IaaS Server Hosting</span>
+        </a>
+        <a href="/billing/licenses.html" class="sidebar-link ${path === '/billing/licenses.html' ? 'active' : ''}">
+          <span class="icon">&#x1F4BB;</span><span class="label">Microsoft 365 Lizenzen</span>
         </a>
       </div>
       <div class="sidebar-section">

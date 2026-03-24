@@ -10,4 +10,5 @@ COPY install-backup-schema.sql /docker-entrypoint-initdb.d/07-backup-schema.sql
 COPY install-configurator-schema.sql /docker-entrypoint-initdb.d/08-configurator-schema.sql
 COPY install-server-service-schema.sql /docker-entrypoint-initdb.d/09-server-service-schema.sql
 COPY install-company-schema.sql /docker-entrypoint-initdb.d/10-company-schema.sql
+COPY install-license-schema.sql /docker-entrypoint-initdb.d/11-license-schema.sql
 RUN chmod 644 /docker-entrypoint-initdb.d/*.sql

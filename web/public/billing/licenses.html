@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microsoft 365 Lizenzen – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Microsoft 365 Lizenzen</h1>
+      <div class="controls">
+        <label for="month-select">Monat:</label>
+        <select id="month-select"><option value="">Laden…</option></select>
+        <button id="sync-btn" class="btn" title="Lizenzen aus Entra ID synchronisieren">Entra Sync</button>
+      </div>
+    </div>
+
+    <div id="license-summary" class="billing-summary"></div>
+    <div id="license-content" class="billing-content">
+      <div class="vm-stats-loading">Lade Lizenzdaten…</div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=10"></script>
+  <script>
+    function fmtEur(val) {
+      return Number(val).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC';
+    }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+    function formatMonth(m) {
+      if (!m) return '';
+      const [y, mo] = m.split('-');
+      return new Date(y, parseInt(mo) - 1).toLocaleDateString('de-DE', { year: 'numeric', month: 'long' });
+    }
+
+    let currentMonth = '';
+
+    async function loadMonths() {
+      try {
+        const res = await fetch('/api/licenses.php?action=months');
+        const months = await res.json();
+        const sel = document.getElementById('month-select');
+        sel.innerHTML = '';
+        for (const m of months.slice(0, 6)) {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = formatMonth(m);
+          sel.appendChild(opt);
+        }
+        if (months.length > 0) {
+          currentMonth = months[0];
+          loadLicenses(currentMonth);
+        } else {
+          document.getElementById('license-content').innerHTML =
+            '<div class="vm-stats-loading">Keine Lizenzdaten vorhanden. Bitte zuerst "Entra Sync" ausf\u00FChren.</div>';
+        }
+      } catch (err) {
+        document.getElementById('license-content').innerHTML =
+          `<div class="vm-stats-loading">Fehler: ${esc(err.message)}</div>`;
+      }
+    }
+
+    async function loadLicenses(month) {
+      const content = document.getElementById('license-content');
+      const summary = document.getElementById('license-summary');
+      content.innerHTML = '<div class="vm-stats-loading">Lade Lizenzdaten…</div>';
+
+      try {
+        const res = await fetch(`/api/licenses.php?month=${encodeURIComponent(month)}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        summary.innerHTML = `
+          <div class="billing-summary-card">
+            <span class="billing-summary-label">${formatMonth(data.month)}</span>
+            <span class="billing-summary-value">${data.total_users} Lizenzzuweisungen</span>
+            <span class="billing-summary-price">${fmtEur(data.total_price)}</span>
+          </div>
+        `;
+
+        if (!data.licenses || data.licenses.length === 0) {
+          content.innerHTML = '<div class="vm-stats-loading">Keine Lizenzdaten f\u00FCr diesen Monat.</div>';
+          return;
+        }
+
+        let html = '';
+        for (const lic of data.licenses) {
+          html += `
+            <div class="billing-company collapsed">
+              <div class="billing-company-header" onclick="toggleLicense(this, '${esc(lic.sku_part_number)}')">
+                <div class="billing-company-info">
+                  <span class="billing-toggle">&#x25BC;</span>
+                  <strong>${esc(lic.display_name)}</strong>
+                  <span class="billing-address">${esc(lic.sku_part_number)}</span>
+                </div>
+                <div class="billing-company-totals">
+                  <span class="billing-count">${lic.user_count} Benutzer</span>
+                  <span class="billing-price">${fmtEur(lic.price)}/User</span>
+                  <span class="billing-price" style="font-weight:700;">${fmtEur(lic.line_total)}</span>
+                </div>
+              </div>
+              <div class="billing-company-body" id="lic-body-${esc(lic.sku_part_number)}">
+                <div class="vm-stats-loading" style="padding:1rem;">Klicken zum Laden…</div>
+              </div>
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="billing-grand-total">
+            <strong>Gesamtsumme</strong>
+            <span>${data.total_users} Lizenzzuweisungen</span>
+            <strong>${fmtEur(data.total_price)}</strong>
+          </div>
+        `;
+
+        content.innerHTML = html;
+      } catch (err) {
+        content.innerHTML = `<div class="vm-stats-loading">Fehler: ${esc(err.message)}</div>`;
+      }
+    }
+
+    const loadedSkus = new Set();
+
+    async function toggleLicense(header, sku) {
+      const parent = header.parentElement;
+      parent.classList.toggle('collapsed');
+
+      if (loadedSkus.has(sku)) return;
+      loadedSkus.add(sku);
+
+      const body = document.getElementById(`lic-body-${sku}`);
+      body.innerHTML = '<div class="vm-stats-loading" style="padding:1rem;">Lade Benutzer…</div>';
+
+      try {
+        const res = await fetch(`/api/licenses.php?action=users&month=${encodeURIComponent(currentMonth)}&sku=${encodeURIComponent(sku)}`);
+        const users = await res.json();
+        if (users.error) throw new Error(users.error);
+
+        let html = `
+          <table class="billing-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>E-Mail</th>
+                <th>Abteilung</th>
+                <th>Firma</th>
+                <th>Ort</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        for (const u of users) {
+          html += `
+            <tr>
+              <td>${esc(u.display_name)}</td>
+              <td>${esc(u.user_principal_name)}</td>
+              <td>${esc(u.department || '')}</td>
+              <td>${esc(u.company_name || '')}</td>
+              <td>${esc(u.city || '')}</td>
+            </tr>
+          `;
+        }
+
+        html += '</tbody></table>';
+        body.innerHTML = html;
+      } catch (err) {
+        body.innerHTML = `<div class="vm-stats-loading" style="padding:1rem;">Fehler: ${esc(err.message)}</div>`;
+        loadedSkus.delete(sku);
+      }
+    }
+
+    // Sync button
+    document.getElementById('sync-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('sync-btn');
+      btn.disabled = true;
+      btn.textContent = 'Synchronisiere…';
+      try {
+        const res = await fetch('/api/licenses.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync' }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        if (typeof showToast === 'function') showToast(data.message, 'success');
+        loadedSkus.clear();
+        loadMonths();
+      } catch (err) {
+        if (typeof showToast === 'function') showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Entra Sync';
+      }
+    });
+
+    // Month change
+    document.getElementById('month-select').addEventListener('change', (e) => {
+      currentMonth = e.target.value;
+      loadedSkus.clear();
+      loadLicenses(currentMonth);
+    });
+
+    loadMonths();
+  </script>
+</body>
+</html>

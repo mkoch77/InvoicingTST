@@ -152,12 +152,33 @@
             </div>
           </div>
         </div>
+
+        <div class="card-group" style="margin-top:2rem;">
+          <h2 class="card-group-title">Microsoft 365 Lizenzen</h2>
+          <div class="settings-section">
+            <h2>Lizenzpreise</h2>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+              Monatlicher Preis pro Benutzer je Lizenztyp.
+            </p>
+            <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+              <table>
+                <thead><tr><th>Lizenz</th><th>SKU</th><th>Preis/User (EUR)</th><th>Aktiv</th></tr></thead>
+                <tbody id="license-sku-rows"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:1rem;">
+              <button class="btn" id="save-license-skus-btn">Lizenzpreise speichern</button>
+            </div>
+          </div>
+        </div>
       `;
 
       loadPricing();
+      loadLicenseSkus();
 
       document.getElementById('save-factors-btn').addEventListener('click', saveFactors);
       document.getElementById('save-tiers-btn').addEventListener('click', saveTiers);
+      document.getElementById('save-license-skus-btn').addEventListener('click', saveLicenseSkus);
     }
 
     async function loadPricing() {
@@ -236,6 +257,66 @@
         body: JSON.stringify({ tiers }),
       });
       showToast(res.ok ? 'Preisklassen gespeichert' : 'Fehler beim Speichern', res.ok ? 'success' : 'error');
+    }
+
+    // ── Lizenz-SKUs ──
+    let licenseSkuData = [];
+
+    async function loadLicenseSkus() {
+      try {
+        const res = await fetch('/api/licenses.php?action=skus');
+        licenseSkuData = await res.json();
+        renderLicenseSkus();
+      } catch (err) {
+        document.getElementById('license-sku-rows').innerHTML =
+          `<tr><td colspan="4">Fehler: ${e(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderLicenseSkus() {
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      const tbody = document.getElementById('license-sku-rows');
+      tbody.innerHTML = '';
+      licenseSkuData.forEach(s => {
+        const tr = document.createElement('tr');
+        if (isAdmin) {
+          tr.innerHTML = `
+            <td><strong>${e(s.display_name)}</strong></td>
+            <td style="color:var(--text-muted);font-size:0.85rem;">${e(s.sku_part_number)}</td>
+            <td><input type="number" class="sku-price" data-id="${s.id}" value="${s.price}" step="0.01" style="width:110px;" /></td>
+            <td><label class="toggle"><input type="checkbox" class="sku-active" data-id="${s.id}" ${s.is_active ? 'checked' : ''} /><span class="slider"></span></label></td>
+          `;
+        } else {
+          tr.innerHTML = `
+            <td><strong>${e(s.display_name)}</strong></td>
+            <td style="color:var(--text-muted);">${e(s.sku_part_number)}</td>
+            <td>${Number(s.price).toLocaleString('de-DE', {minimumFractionDigits:2})} \u20AC</td>
+            <td>${s.is_active ? 'Ja' : 'Nein'}</td>
+          `;
+        }
+        tbody.appendChild(tr);
+      });
+      document.getElementById('save-license-skus-btn').style.display = isAdmin ? '' : 'none';
+    }
+
+    async function saveLicenseSkus() {
+      const skus = [];
+      document.querySelectorAll('.sku-price').forEach(inp => {
+        const id = parseInt(inp.dataset.id);
+        const active = document.querySelector(`.sku-active[data-id="${id}"]`);
+        skus.push({
+          id: id,
+          price: parseFloat(inp.value),
+          is_active: active ? active.checked : true,
+        });
+      });
+      const res = await fetch('/api/licenses.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_skus', skus }),
+      });
+      const data = await res.json();
+      showToast(res.ok ? 'Lizenzpreise gespeichert' : (data.error || 'Fehler'), res.ok ? 'success' : 'error');
     }
 
     // ── Kalkulator-Einstellungen ──
