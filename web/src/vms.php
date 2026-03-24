@@ -32,7 +32,8 @@ function fetchVMs(?string $month = null): array
             v.customer_id,
             c.code AS customer_code,
             c.name AS customer_name,
-            ssm.cmdb_customer AS cmdb_customer,
+            (SELECT ssm.cmdb_customer FROM server_service_mapping ssm
+             WHERE UPPER(ssm.hostname) = UPPER(v.hostname) LIMIT 1) AS cmdb_customer,
             ARRAY_AGG(ip.ip_address::TEXT ORDER BY ip.ip_address)
                 FILTER (WHERE ip.ip_address IS NOT NULL) AS ip_addresses
         FROM vm v
@@ -40,7 +41,6 @@ function fetchVMs(?string $month = null): array
         LEFT JOIN power_state ps ON ps.id = v.power_state_id
         LEFT JOIN vm_ip_address ip ON ip.vm_id = v.id
         LEFT JOIN customer c ON c.id = v.customer_id
-        LEFT JOIN server_service_mapping ssm ON UPPER(ssm.hostname) = UPPER(v.hostname)
     ";
     $params = [];
 
@@ -53,7 +53,7 @@ function fetchVMs(?string $month = null): array
     }
 
     $query .= "
-        GROUP BY v.id, os.name, ps.name, c.code, c.name, ssm.cmdb_customer
+        GROUP BY v.id, os.name, ps.name, c.code, c.name
         ORDER BY v.hostname, v.exported_at DESC
     ";
 
