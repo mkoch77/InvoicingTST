@@ -132,16 +132,18 @@ function syncCompanyStructure(string $username = 'system'): array
     $SERVER_NAME = '1964';
     $SERVER_IT_SERVICE = '2613';
     $SERVER_CUSTOMER = '2214';
+    $SERVER_COST_CENTER = '2107';
 
     $serverObjects = $client->searchAllObjects('objectType = "Server" AND objectSchemaId = 8 AND Status = "Active"');
     AppLogger::info('company-sync', "Fetched " . count($serverObjects) . " active Server objects", [], $username);
 
     $ssmStmt = $pdo->prepare("
-        INSERT INTO server_service_mapping (hostname, it_service, cmdb_customer, cmdb_key, updated_at)
-        VALUES (:hostname, :it_service, :cmdb_customer, :cmdb_key, NOW())
+        INSERT INTO server_service_mapping (hostname, it_service, cmdb_customer, cost_center_number, cmdb_key, updated_at)
+        VALUES (:hostname, :it_service, :cmdb_customer, :cost_center_number, :cmdb_key, NOW())
         ON CONFLICT (hostname) DO UPDATE SET
             it_service = EXCLUDED.it_service,
             cmdb_customer = EXCLUDED.cmdb_customer,
+            cost_center_number = EXCLUDED.cost_center_number,
             cmdb_key = EXCLUDED.cmdb_key,
             updated_at = NOW()
     ");
@@ -152,6 +154,7 @@ function syncCompanyStructure(string $username = 'system'): array
         $name = $getAttr($obj['attributes'] ?? [], $SERVER_NAME);
         $itService = $getAttr($obj['attributes'] ?? [], $SERVER_IT_SERVICE);
         $cmdbCustomer = $getAttr($obj['attributes'] ?? [], $SERVER_CUSTOMER) ?: null;
+        $costCenterNr = $getAttr($obj['attributes'] ?? [], $SERVER_COST_CENTER) ?: null;
 
         if (!$name || !$itService) continue;
 
@@ -162,6 +165,7 @@ function syncCompanyStructure(string $username = 'system'): array
             'hostname' => $hostname,
             'it_service' => $itService,
             'cmdb_customer' => $cmdbCustomer,
+            'cost_center_number' => $costCenterNr,
             'cmdb_key' => $key,
         ]);
         $serverSynced++;

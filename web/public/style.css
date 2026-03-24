@@ -1189,3 +1189,79 @@ thead th.has-filter .filter-icon {
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(40px); }
 }
+
+/* ── Billing Page ── */
+.billing-summary { margin-bottom: 1.5rem; }
+.billing-summary-card {
+  display: flex; align-items: center; gap: 2rem;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1.2rem 1.5rem; font-size: 1.1rem;
+}
+.billing-summary-label { color: var(--text-muted); }
+.billing-summary-value { font-weight: 600; }
+.billing-summary-price { font-weight: 700; font-size: 1.3rem; margin-left: auto; color: var(--accent, #4ade80); }
+
+.billing-company {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 1rem; overflow: hidden;
+}
+.billing-company-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.8rem 1.2rem; cursor: pointer; user-select: none;
+  background: rgba(255,255,255,0.03);
+}
+.billing-company-header:hover { background: rgba(255,255,255,0.06); }
+.billing-company-info { display: flex; align-items: center; gap: 0.6rem; }
+.billing-address { color: var(--text-muted); font-size: 0.85rem; }
+.billing-company-totals { display: flex; gap: 1.5rem; align-items: center; }
+.billing-count { color: var(--text-muted); font-size: 0.9rem; }
+.billing-price { font-weight: 600; min-width: 100px; text-align: right; }
+
+.billing-company.collapsed .billing-company-body { display: none; }
+.billing-company.collapsed .billing-toggle { transform: rotate(-90deg); }
+
+.billing-company-body { padding: 0 1.2rem 1rem; }
+
+.billing-company-subtotal {
+  display: flex; justify-content: space-between;
+  padding: 0.8rem 0; margin-top: 0.5rem;
+  border-top: 2px solid var(--border); font-size: 1.05rem;
+}
+
+.billing-cc { margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.billing-cc-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 1rem; cursor: pointer; user-select: none;
+  background: rgba(255,255,255,0.02);
+}
+.billing-cc-header:hover { background: rgba(255,255,255,0.05); }
+.billing-cc-info { display: flex; align-items: center; gap: 0.5rem; }
+.billing-bearer { color: var(--text-muted); font-size: 0.85rem; }
+.billing-cc-totals { display: flex; gap: 1.5rem; align-items: center; }
+
+.billing-cc.collapsed .billing-cc-body { display: none; }
+.billing-cc.collapsed .billing-toggle { transform: rotate(-90deg); }
+
+.billing-cc-body { padding: 0; }
+
+.billing-toggle {
+  display: inline-block; font-size: 0.7rem; transition: transform 0.2s;
+  color: var(--text-muted); width: 1em; text-align: center;
+}
+
+.billing-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.billing-table th {
+  text-align: left; padding: 0.4rem 0.6rem; font-weight: 600;
+  border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem;
+}
+.billing-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.billing-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.billing-table tfoot td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 0.5rem; }
+.billing-subtotal td { font-size: 0.9rem; }
+
+.billing-grand-total {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--card-bg); border: 2px solid var(--accent, #4ade80); border-radius: 8px;
+  padding: 1rem 1.5rem; margin-top: 1.5rem; font-size: 1.1rem;
+}
+.billing-grand-total span { color: var(--text-muted); }

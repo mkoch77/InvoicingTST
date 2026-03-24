@@ -36,10 +36,11 @@
 
         <div class="card card-vm">
           <div class="card-icon">&#x1F4B0;</div>
-          <h2>Infrastructure-as-a-Service</h2>
+          <h2>IaaS – Server Hosting</h2>
           <div id="billing-stats" class="vm-stats">
             <div class="vm-stats-loading">Lade Abrechnung…</div>
           </div>
+          <a href="/billing/iaas.html" class="card-link">Abrechnung anzeigen &rarr;</a>
         </div>
 
       </div>
@@ -103,25 +104,11 @@
         return;
       }
 
-      const classes = b.class_counts || {};
-      let rows = '';
-      for (const [cls, data] of Object.entries(classes)) {
-        const lineTotal = data.count * data.price;
-        rows += `
-          <div class="stat-row">
-            <span class="stat-label">${cls} <span style="color:var(--text-muted);font-weight:400;">&times; ${data.count}</span></span>
-            <span class="stat-value">${fmtEur(lineTotal)}</span>
-          </div>
-        `;
-      }
-
       container.innerHTML = `
         <div class="vm-stats-month">${formatMonth(s.month)}</div>
         <div class="vm-stats-grid">
-          ${rows}
-          <div class="stat-divider"></div>
           <div class="stat-row stat-total">
-            <span class="stat-label">${b.vm_count} VMs</span>
+            <span class="stat-label">${b.vm_count} Server</span>
             <span class="stat-value">${fmtEur(b.total_price)}</span>
           </div>
         </div>

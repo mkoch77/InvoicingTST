@@ -74,6 +74,12 @@ function buildSidebar() {
         </a>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">Abrechnung</div>
+        <a href="/billing/iaas.html" class="sidebar-link ${path.startsWith('/billing') ? 'active' : ''}">
+          <span class="icon">&#x1F4B0;</span><span class="label">IaaS Server Hosting</span>
+        </a>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">Einstellungen</div>
         <a href="/stammdaten/" class="sidebar-link ${path.startsWith('/stammdaten') ? 'active' : ''}">
           <span class="icon">&#x1F4C1;</span><span class="label">Stammdaten</span>

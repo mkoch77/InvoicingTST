@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IaaS Abrechnung – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=10">
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>IaaS – Server Hosting</h1>
+      <div class="controls">
+        <label for="month-select">Monat:</label>
+        <select id="month-select"><option value="">Laden…</option></select>
+        <button id="expand-all-btn" class="btn btn-sm">Alle aufklappen</button>
+        <button id="collapse-all-btn" class="btn btn-sm">Alle zuklappen</button>
+      </div>
+    </div>
+
+    <div id="billing-summary" class="billing-summary"></div>
+    <div id="billing-content" class="billing-content">
+      <div class="vm-stats-loading">Lade Abrechnungsdaten…</div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=10"></script>
+  <script>
+    let billingData = null;
+
+    function fmtEur(val) {
+      return Number(val).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC';
+    }
+
+    function fmtNum(val) {
+      return Number(val).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s ?? '';
+      return d.innerHTML;
+    }
+
+    function formatMonth(m) {
+      if (!m) return '';
+      const [y, mo] = m.split('-');
+      const d = new Date(y, parseInt(mo) - 1);
+      return d.toLocaleDateString('de-DE', { year: 'numeric', month: 'long' });
+    }
+
+    async function loadBilling(month) {
+      const content = document.getElementById('billing-content');
+      const summary = document.getElementById('billing-summary');
+      content.innerHTML = '<div class="vm-stats-loading">Lade Abrechnungsdaten…</div>';
+
+      try {
+        const url = month ? `/api/billing-iaas.php?month=${encodeURIComponent(month)}` : '/api/billing-iaas.php';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        billingData = data;
+
+        // Month selector
+        const sel = document.getElementById('month-select');
+        if (sel.options.length <= 1 && data.months) {
+          sel.innerHTML = '';
+          for (const m of data.months) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = formatMonth(m);
+            if (m === data.month) opt.selected = true;
+            sel.appendChild(opt);
+          }
+        }
+
+        // Summary
+        summary.innerHTML = `
+          <div class="billing-summary-card">
+            <span class="billing-summary-label">${formatMonth(data.month)}</span>
+            <span class="billing-summary-value">${data.total_count} Server</span>
+            <span class="billing-summary-price">${fmtEur(data.total_price)}</span>
+          </div>
+        `;
+
+        // Companies
+        if (!data.companies || data.companies.length === 0) {
+          content.innerHTML = '<div class="vm-stats-loading">Keine IaaS-Server gefunden.</div>';
+          return;
+        }
+
+        let html = '';
+        for (const company of data.companies) {
+          html += `
+            <div class="billing-company">
+              <div class="billing-company-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <div class="billing-company-info">
+                  <span class="billing-toggle">&#x25BC;</span>
+                  <strong>${esc(company.company)}</strong>
+                  ${company.address ? `<span class="billing-address">${esc(company.address)}</span>` : ''}
+                </div>
+                <div class="billing-company-totals">
+                  <span class="billing-count">${company.total_count} Server</span>
+                  <span class="billing-price">${fmtEur(company.total_price)}</span>
+                </div>
+              </div>
+              <div class="billing-company-body">
+          `;
+
+          for (const cc of company.cost_centers) {
+            html += `
+              <div class="billing-cc">
+                <div class="billing-cc-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                  <div class="billing-cc-info">
+                    <span class="billing-toggle">&#x25BC;</span>
+                    <strong>KSt ${esc(cc.number)}</strong>
+                    ${cc.bearer ? `<span class="billing-bearer">${esc(cc.bearer)}</span>` : ''}
+                  </div>
+                  <div class="billing-cc-totals">
+                    <span class="billing-count">${cc.total_count} Server</span>
+                    <span class="billing-price">${fmtEur(cc.total_price)}</span>
+                  </div>
+                </div>
+                <div class="billing-cc-body">
+                  <table class="billing-table">
+                    <thead>
+                      <tr>
+                        <th>Hostname</th>
+                        <th>Kunde (CMDB)</th>
+                        <th>vCPU</th>
+                        <th>RAM (MB)</th>
+                        <th>Storage (GB)</th>
+                        <th>Punkte</th>
+                        <th>Klasse</th>
+                        <th>Preis</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            for (const srv of cc.servers) {
+              const stateClass = srv.power_state === 'On' ? 'state-on' :
+                                 srv.power_state === 'Off' ? 'state-off' : '';
+              html += `
+                      <tr>
+                        <td>${esc(srv.hostname)}</td>
+                        <td>${esc(srv.cmdb_customer || '')}</td>
+                        <td>${srv.vcpu}</td>
+                        <td>${srv.vram_mb}</td>
+                        <td>${srv.provisioned_storage_gb}</td>
+                        <td class="num">${fmtNum(srv.points)}</td>
+                        <td>${esc(srv.pricing_class)}</td>
+                        <td class="num">${fmtEur(srv.price)}</td>
+                      </tr>
+              `;
+            }
+
+            html += `
+                    </tbody>
+                    <tfoot>
+                      <tr class="billing-subtotal">
+                        <td colspan="7"><strong>Summe KSt ${esc(cc.number)}</strong></td>
+                        <td class="num"><strong>${fmtEur(cc.total_price)}</strong></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            `;
+          }
+
+          html += `
+                <div class="billing-company-subtotal">
+                  <strong>Summe ${esc(company.company)}</strong>
+                  <strong>${fmtEur(company.total_price)}</strong>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Grand total
+        html += `
+          <div class="billing-grand-total">
+            <strong>Gesamtsumme</strong>
+            <span>${data.total_count} Server</span>
+            <strong>${fmtEur(data.total_price)}</strong>
+          </div>
+        `;
+
+        content.innerHTML = html;
+      } catch (err) {
+        content.innerHTML = `<div class="vm-stats-loading">Fehler: ${esc(err.message)}</div>`;
+      }
+    }
+
+    // Month change
+    document.getElementById('month-select').addEventListener('change', (e) => {
+      loadBilling(e.target.value);
+    });
+
+    // Expand/collapse all
+    document.getElementById('expand-all-btn').addEventListener('click', () => {
+      document.querySelectorAll('.billing-company, .billing-cc').forEach(el => el.classList.remove('collapsed'));
+    });
+    document.getElementById('collapse-all-btn').addEventListener('click', () => {
+      document.querySelectorAll('.billing-company, .billing-cc').forEach(el => el.classList.add('collapsed'));
+    });
+
+    loadBilling();
+  </script>
+</body>
+</html>
