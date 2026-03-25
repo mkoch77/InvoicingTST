@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_once __DIR__ . '/../../src/intune.php';
         try {
             $result = syncIntuneDevices($user['username']);
-            echo json_encode(['message' => "{$result['devices']} Geraete synchronisiert, {$result['cmdb']} mit CMDB angereichert ({$result['month']})"]);
+            echo json_encode(['message' => "{$result['devices']} Geraete ({$result['intune']} Intune + {$result['docks']} Docks), {$result['cmdb']} CMDB-angereichert ({$result['month']})"]);
         } catch (\Exception $e) {
             AppLogger::error('device-sync', $e->getMessage(), [], $user['username']);
             http_response_code(500);

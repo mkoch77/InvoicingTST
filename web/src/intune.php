@@ -151,11 +151,89 @@ function syncIntuneDevices(string $username = 'system'): array
         }
 
         AppLogger::info('device-sync', "CMDB enrichment: {$cmdbEnriched} devices updated", [], $username);
+
+        // ── Sync Dockingstations from CMDB ──
+        $DOCK_NAME = '1964';
+        $DOCK_SERIAL = '1967';
+        $DOCK_USER = '2109';
+        $DOCK_MODEL = '2151';
+        $DOCK_COST_CENTER = '2107';
+
+        $dockObjects = $cmdb->searchAllObjects('objectType = "Dockingstation" AND objectSchemaId = 8 AND Status = "Active"');
+        AppLogger::info('device-sync', 'Fetched ' . count($dockObjects) . ' CMDB Dockingstation objects', [], $username);
+
+        $dockCount = 0;
+        foreach ($dockObjects as $obj) {
+            $key = $obj['objectKey'] ?? '';
+            $dockName = $getAttr($obj['attributes'] ?? [], $DOCK_NAME);
+            $serial = $getAttr($obj['attributes'] ?? [], $DOCK_SERIAL);
+            $userName = $getAttr($obj['attributes'] ?? [], $DOCK_USER);
+            $model = $getAttr($obj['attributes'] ?? [], $DOCK_MODEL);
+            $dockCc = $getAttr($obj['attributes'] ?? [], $DOCK_COST_CENTER);
+
+            if (!$dockName) continue;
+
+            // Determine manufacturer from model
+            $manufacturer = '';
+            $modelLower = strtolower($model);
+            if (str_contains($modelLower, 'hp') || str_contains($modelLower, 'hewlett')) {
+                $manufacturer = 'HP';
+            } elseif (str_contains($modelLower, 'lenovo')) {
+                $manufacturer = 'Lenovo';
+            } elseif (str_contains($modelLower, 'dell')) {
+                $manufacturer = 'Dell';
+            } elseif (str_contains($modelLower, 'microsoft')) {
+                $manufacturer = 'Microsoft';
+            }
+
+            $pricing = classifyDevice($manufacturer, $model ?: 'Dock', $tiers);
+
+            // Resolve company from cost center
+            $dockCompany = '';
+            if ($dockCc && isset($validCostCenters[$dockCc])) {
+                // Company will be resolved in billing via cost_center → company table
+            }
+
+            // Use CMDB key as device_id to avoid conflicts with Intune IDs
+            $stmt->execute([
+                'device_id'    => 'cmdb-' . $key,
+                'azure_id'     => null,
+                'name'         => $dockName,
+                'serial'       => $serial ?: null,
+                'manufacturer' => $manufacturer ?: null,
+                'model'        => $model ?: 'Dockingstation',
+                'user_name'    => $userName ?: null,
+                'upn'          => null,
+                'compliance'   => 'active',
+                'last_sync'    => null,
+                'month'        => $currentMonth,
+                'category'     => $pricing['category'] ?? 'Alt Dock',
+                'price'        => $pricing['price'] ?? 0,
+            ]);
+
+            // Set cost center directly (no UPN matching needed)
+            if ($dockCc) {
+                $pdo->prepare("
+                    UPDATE intune_device SET cost_center = :cc
+                    WHERE device_id = :did AND export_month = :month
+                ")->execute([
+                    'cc'    => $dockCc,
+                    'did'   => 'cmdb-' . $key,
+                    'month' => $currentMonth,
+                ]);
+            }
+
+            $dockCount++;
+        }
+
+        AppLogger::info('device-sync', "Dockingstation sync: {$dockCount} docks synced", [], $username);
+
     } catch (\Exception $e) {
         AppLogger::warn('device-sync', "CMDB enrichment failed: {$e->getMessage()}", [], $username);
     }
 
-    AppLogger::info('device-sync', "Sync complete: {$count} devices, {$cmdbEnriched} CMDB-enriched ({$currentMonth})", [], $username);
+    $totalDevices = $count + ($dockCount ?? 0);
+    AppLogger::info('device-sync', "Sync complete: {$count} Intune devices, " . ($dockCount ?? 0) . " docks, {$cmdbEnriched} CMDB-enriched ({$currentMonth})", [], $username);
 
-    return ['devices' => $count, 'cmdb' => $cmdbEnriched, 'month' => $currentMonth];
+    return ['devices' => $totalDevices, 'intune' => $count, 'docks' => $dockCount ?? 0, 'cmdb' => $cmdbEnriched, 'month' => $currentMonth];
 }
