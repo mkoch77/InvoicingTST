@@ -25,6 +25,7 @@
           <option value="all">Alle</option>
         </select>
         <span id="user-count" class="count"></span>
+        <button id="export-btn" class="btn" title="Als Excel/CSV exportieren">&#x2B07; Excel</button>
         <button id="sync-btn" class="btn" title="Aus Entra ID synchronisieren">Entra Sync</button>
       </div>
     </div>
@@ -235,6 +236,31 @@
         btn.disabled = false; btn.textContent = 'Entra Sync';
       }
     });
+
+    // Excel/CSV Export
+    document.getElementById('export-btn').addEventListener('click', () => {
+      const filtered = getFiltered();
+      if (!filtered.length) return;
+      const headers = ['Name', 'E-Mail', 'Lizenz', 'Abteilung', 'Firma', 'Adresse', 'Ort'];
+      const rows = filtered.map(u => [
+        u.display_name, u.user_principal_name, u.license_name,
+        u.department || '', u.company_name || '', u.street_address || '', u.city || ''
+      ]);
+      downloadCsv(headers, rows, `Lizenzen_${currentMonth}.csv`);
+    });
+
+    function downloadCsv(headers, rows, filename) {
+      const escape = v => '"' + String(v).replace(/"/g, '""') + '"';
+      const lines = [headers.map(escape).join(';')];
+      for (const row of rows) lines.push(row.map(escape).join(';'));
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
 
     init();
   </script>
