@@ -134,10 +134,12 @@ function syncNetboxDevices(string $username = 'system'): array
 
         // Classify: switch or access point
         $category = null;
-        if (str_contains($role, 'switch') || str_contains($role, 'router')) {
+        $switchRoles = ['switch-ethernet', 'switch-fibrechannel', 'leaf', 'spine', 'border-leaf'];
+        $apRoles = ['accesspoint', 'wlc'];
+        if (in_array($role, $switchRoles) || str_contains($role, 'switch') || str_contains($role, 'leaf') || str_contains($role, 'spine')) {
             $category = 'switch';
-        } elseif (str_contains($role, 'access point') || str_contains($role, 'wireless') ||
-                  str_contains($role, 'wifi') || str_contains($role, ' ap') || $role === 'ap') {
+        } elseif (in_array($role, $apRoles) || str_contains($role, 'access') || str_contains($role, 'wireless') ||
+                  str_contains($role, 'wifi') || str_contains($role, 'wlc')) {
             $category = 'accesspoint';
         }
 
