@@ -43,10 +43,10 @@ try {
     $totalPrice = 0.0;
 
     foreach ($rows as $row) {
+        $ccNumber = $row['cost_center'] ?: 'Nicht zugeordnet';
         // Resolve company ONLY from Firmenstruktur (cost_center → company)
         $companyName = (isset($ccInfo[$ccNumber]) && $ccInfo[$ccNumber]['company_name'])
             ? $ccInfo[$ccNumber]['company_name'] : 'Nicht zugeordnet';
-        $ccNumber = $row['cost_center'] ?: 'Nicht zugeordnet';
         $upn = $row['user_principal_name'] ?: 'Kein Benutzer';
         $price = (float) ($row['device_price'] ?? 0);
 
