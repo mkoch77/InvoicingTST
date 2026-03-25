@@ -28,6 +28,7 @@
     <div class="admin-tabs" id="admin-tabs">
       <button class="admin-tab active" data-tab="users">Benutzer</button>
       <button class="admin-tab" data-tab="cmdb">CMDB Browser</button>
+      <button class="admin-tab" data-tab="billing">Abrechnung</button>
       <button class="admin-tab" data-tab="backup">Backup</button>
       <button class="admin-tab" data-tab="logs">Logs</button>
     </div>
@@ -101,6 +102,46 @@
     </div>
 
     <!-- ═══ TAB: Backup ═══ -->
+    <div class="tab-content" id="tab-billing">
+      <div class="settings-grid">
+        <div class="settings-section">
+          <h2>Abrechnungszeitpunkt</h2>
+          <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:1rem;">
+            Am konfigurierten Tag wird automatisch ein Snapshot aller Abrechnungsdaten erstellt.
+          </p>
+          <div class="form-group">
+            <label>Tag des Monats (1-28)</label>
+            <input type="number" id="billing-day" min="1" max="28" value="1" style="width:80px;" />
+          </div>
+          <div class="form-group">
+            <label>Uhrzeit (Stunde, 0-23)</label>
+            <input type="number" id="billing-hour" min="0" max="23" value="6" style="width:80px;" />
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:.5rem;">
+              <span class="toggle"><input type="checkbox" id="billing-auto" checked /><span class="slider"></span></span>
+              Automatische Erstellung
+            </label>
+          </div>
+          <button class="btn" id="save-billing-config">Einstellungen speichern</button>
+        </div>
+        <div class="settings-section" style="grid-column: span 2;">
+          <h2>Snapshots</h2>
+          <div style="margin-bottom:1rem;display:flex;gap:.5rem;align-items:center;">
+            <label>Monat:</label>
+            <input type="month" id="snapshot-month" />
+            <button class="btn" id="create-snapshot-btn">Snapshot erstellen</button>
+          </div>
+          <div class="table-wrap" style="max-height:500px;">
+            <table>
+              <thead><tr><th>Monat</th><th>Erstellt</th><th>Von</th><th>IaaS</th><th>Lizenzen</th><th>Geräte</th><th>Gesamt</th><th>Aktionen</th></tr></thead>
+              <tbody id="snapshot-rows"><tr><td colspan="8" class="empty">Lade Snapshots…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-backup">
       <div class="settings-grid">
         <!-- Backup erstellen -->
@@ -241,6 +282,7 @@
         tabInited[tabName] = true;
         if (tabName === 'users') loadUsers();
         if (tabName === 'cmdb') initCmdb();
+        if (tabName === 'billing') initBilling();
         if (tabName === 'backup') initBackup();
         if (tabName === 'logs') loadLogs();
       }
@@ -536,6 +578,132 @@
     //  TAB: Backup
     // ══════════════════════════════════════════
     const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+    // ── Billing Snapshots ──
+    function fmtEur(val) { return Number(val).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC'; }
+
+    async function initBilling() {
+      // Load config
+      try {
+        const res = await fetch('/api/billing-snapshot.php?action=config');
+        const cfg = await res.json();
+        document.getElementById('billing-day').value = cfg.billing_day || 1;
+        document.getElementById('billing-hour').value = cfg.billing_hour || 6;
+        document.getElementById('billing-auto').checked = cfg.billing_auto !== false;
+      } catch (err) {}
+
+      // Set default month to last month
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      document.getElementById('snapshot-month').value = lastMonth.toISOString().slice(0, 7);
+
+      loadSnapshots();
+
+      document.getElementById('save-billing-config').addEventListener('click', async () => {
+        const res = await fetch('/api/billing-snapshot.php', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            config: {
+              billing_day: document.getElementById('billing-day').value,
+              billing_hour: document.getElementById('billing-hour').value,
+              billing_auto: document.getElementById('billing-auto').checked ? 'true' : 'false',
+            }
+          }),
+        });
+        showToast(res.ok ? 'Einstellungen gespeichert' : 'Fehler', res.ok ? 'success' : 'error');
+      });
+
+      document.getElementById('create-snapshot-btn').addEventListener('click', async () => {
+        const month = document.getElementById('snapshot-month').value;
+        if (!month) { showToast('Bitte Monat waehlen', 'error'); return; }
+        const btn = document.getElementById('create-snapshot-btn');
+        btn.disabled = true; btn.textContent = 'Erstelle...';
+        try {
+          const res = await fetch('/api/billing-snapshot.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'create', month }),
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          showToast(data.message, 'success');
+          loadSnapshots();
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false; btn.textContent = 'Snapshot erstellen';
+        }
+      });
+    }
+
+    async function loadSnapshots() {
+      const tbody = document.getElementById('snapshot-rows');
+      try {
+        const res = await fetch('/api/billing-snapshot.php');
+        const snapshots = await res.json();
+        if (!snapshots.length) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty">Keine Snapshots vorhanden</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        for (const s of snapshots) {
+          const sum = s.summary || {};
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${e(s.snapshot_month)}</strong></td>
+            <td>${fmtDate(s.created_at)}</td>
+            <td>${e(s.created_by)}</td>
+            <td>${sum.iaas ? sum.iaas.count + ' Server / ' + fmtEur(sum.iaas.total_price) : '-'}</td>
+            <td>${sum.licenses ? sum.licenses.assignments + ' Liz. / ' + fmtEur(sum.licenses.total_price) : '-'}</td>
+            <td>${sum.devices ? sum.devices.count + ' Geräte / ' + fmtEur(sum.devices.total_price) : '-'}</td>
+            <td><strong>${sum.grand_total != null ? fmtEur(sum.grand_total) : '-'}</strong></td>
+            <td style="display:flex;gap:.3rem;">
+              <button class="btn-sm" onclick="viewSnapshot(${s.id})">Details</button>
+              <button class="btn-sm btn-danger" onclick="deleteSnapshotBtn(${s.id}, '${e(s.snapshot_month)}')">Löschen</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">Fehler: ' + e(err.message) + '</td></tr>';
+      }
+    }
+
+    async function viewSnapshot(id) {
+      try {
+        const res = await fetch('/api/billing-snapshot.php?id=' + id);
+        const s = await res.json();
+        if (s.error) throw new Error(s.error);
+        const sum = s.summary;
+        const details = `Snapshot ${sum.month}\nErstellt: ${s.created_at}\n\n` +
+          `IaaS: ${sum.iaas.count} Server = ${fmtEur(sum.iaas.total_price)}\n` +
+          `Lizenzen: ${sum.licenses.assignments} Zuweisungen (${sum.licenses.users} User) = ${fmtEur(sum.licenses.total_price)}\n` +
+          `Geräte: ${sum.devices.count} Geräte = ${fmtEur(sum.devices.total_price)}\n\n` +
+          `GESAMT: ${fmtEur(sum.grand_total)}\n\n` +
+          `Preiskonfiguration zum Zeitpunkt:\n` +
+          JSON.stringify(sum.pricing_config, null, 2);
+        alert(details);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteSnapshotBtn(id, month) {
+      if (!confirm('Snapshot ' + month + ' wirklich loeschen?')) return;
+      try {
+        const res = await fetch('/api/billing-snapshot.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id }),
+        });
+        if (!res.ok) throw new Error('Löschen fehlgeschlagen');
+        showToast('Snapshot gelöscht', 'success');
+        loadSnapshots();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
 
     function initBackup() {
       // Build day checkboxes

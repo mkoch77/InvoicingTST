@@ -339,13 +339,11 @@ function renderTable() {
       vm.power_state === 'Off' ? 'state-off' :
       vm.power_state === 'Suspended' ? 'state-suspended' : '';
 
-    const customerCell = canAssign
-      ? customerSelectHtml(vm.hostname, vm.customer_id)
-      : esc(vm.customer_name ? `${vm.customer_code} – ${vm.customer_name}` : '');
+    const customerText = vm.customer_name ? `${vm.customer_code} – ${vm.customer_name}` : '';
 
     tr.innerHTML = `
       <td>${esc(vm.hostname)}</td>
-      <td class="customer-cell">${customerCell}</td>
+      <td>${esc(customerText)}</td>
       <td>${esc(vm.cmdb_customer || '')}</td>
       <td class="ip-cell">${esc(ips)}</td>
       <td class="os-cell">${esc(vm.operating_system || '')}</td>

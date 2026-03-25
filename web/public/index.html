@@ -45,6 +45,24 @@
           <a href="/devices.html" class="card-link">Alle Geräte anzeigen &rarr;</a>
         </div>
 
+        <div class="card card-vm">
+          <div class="card-icon">&#x1F50C;</div>
+          <h2>Switches</h2>
+          <div id="switch-stats" class="vm-stats">
+            <div class="vm-stats-loading">Lade Daten…</div>
+          </div>
+          <a href="/switches.html" class="card-link">Alle Switches anzeigen &rarr;</a>
+        </div>
+
+        <div class="card card-vm">
+          <div class="card-icon">&#x1F4E1;</div>
+          <h2>Access Points</h2>
+          <div id="ap-stats" class="vm-stats">
+            <div class="vm-stats-loading">Lade Daten…</div>
+          </div>
+          <a href="/accesspoints.html" class="card-link">Alle APs anzeigen &rarr;</a>
+        </div>
+
       </div>
     </div>
 
@@ -131,6 +149,7 @@
         renderLicenseRaw(s);
         renderDeviceRaw(s);
         renderDeviceBilling(s);
+        renderNetboxStats();
       } catch (err) {
         container.innerHTML = `<div class="vm-stats-loading">Fehler: ${err.message}</div>`;
       }
@@ -260,6 +279,41 @@
             </div>
           `;
         });
+    }
+
+    async function renderNetboxStats() {
+      const swContainer = document.getElementById('switch-stats');
+      const apContainer = document.getElementById('ap-stats');
+      try {
+        const res = await fetch('/api/netbox.php?action=stats');
+        const d = await res.json();
+        if (!d.month) {
+          swContainer.innerHTML = '<div class="vm-stats-loading">Keine Daten</div>';
+          apContainer.innerHTML = '<div class="vm-stats-loading">Keine Daten</div>';
+          return;
+        }
+        swContainer.innerHTML = `
+          <div class="vm-stats-month">${formatMonth(d.month)}</div>
+          <div class="vm-stats-grid">
+            <div class="stat-row stat-total">
+              <span class="stat-label">Switches</span>
+              <span class="stat-value">${d.switches}</span>
+            </div>
+          </div>
+        `;
+        apContainer.innerHTML = `
+          <div class="vm-stats-month">${formatMonth(d.month)}</div>
+          <div class="vm-stats-grid">
+            <div class="stat-row stat-total">
+              <span class="stat-label">Access Points</span>
+              <span class="stat-value">${d.accesspoints}</span>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        swContainer.innerHTML = '<div class="vm-stats-loading">Fehler</div>';
+        apContainer.innerHTML = '<div class="vm-stats-loading">Fehler</div>';
+      }
     }
 
     function fmtEur(val) {

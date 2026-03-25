@@ -12,4 +12,6 @@ COPY install-server-service-schema.sql /docker-entrypoint-initdb.d/09-server-ser
 COPY install-company-schema.sql /docker-entrypoint-initdb.d/10-company-schema.sql
 COPY install-license-schema.sql /docker-entrypoint-initdb.d/11-license-schema.sql
 COPY install-device-schema.sql /docker-entrypoint-initdb.d/12-device-schema.sql
+COPY install-netbox-schema.sql /docker-entrypoint-initdb.d/13-netbox-schema.sql
+COPY install-billing-snapshot-schema.sql /docker-entrypoint-initdb.d/14-billing-snapshot-schema.sql
 RUN chmod 644 /docker-entrypoint-initdb.d/*.sql

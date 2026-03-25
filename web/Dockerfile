@@ -43,6 +43,9 @@ RUN echo '0 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sy
     && echo '30 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-companies.php >> /var/log/cron-sync.log 2>&1' >> /etc/cron.d/cmdb-sync \
     && echo '15 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-licenses.php >> /var/log/cron-sync.log 2>&1' > /etc/cron.d/entra-sync \
     && echo '45 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-devices.php >> /var/log/cron-sync.log 2>&1' >> /etc/cron.d/entra-sync \
+    && echo '50 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/sync-netbox.php >> /var/log/cron-sync.log 2>&1' > /etc/cron.d/netbox-sync \
+    && echo '5 * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/billing-snapshot.php >> /var/log/cron-billing.log 2>&1' > /etc/cron.d/billing-snapshot \
+    && chmod 644 /etc/cron.d/netbox-sync /etc/cron.d/billing-snapshot \
     && echo '* * * * * root . /etc/environment; /usr/local/bin/php /var/www/cron/backup.php >> /var/log/cron-backup.log 2>&1' > /etc/cron.d/backup \
     && chmod 644 /etc/cron.d/cmdb-sync /etc/cron.d/entra-sync /etc/cron.d/backup
 
