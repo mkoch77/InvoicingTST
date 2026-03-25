@@ -22,8 +22,9 @@ function getBillingConfig(): array
     } catch (\Exception $e) {
         $rows = [];
     }
+    $day = $rows['billing_day'] ?? '1';
     return [
-        'billing_day'  => (int) ($rows['billing_day'] ?? 1),
+        'billing_day'  => $day === 'last' ? 'last' : (int) $day,
         'billing_hour' => (int) ($rows['billing_hour'] ?? 6),
         'billing_auto' => ($rows['billing_auto'] ?? 'true') === 'true',
     ];
@@ -40,8 +41,16 @@ function shouldCreateSnapshot(): bool
     $now = new \DateTime();
     $day = (int) $now->format('j');
     $hour = (int) $now->format('G');
+    $billingDay = $config['billing_day'];
 
-    if ($day !== $config['billing_day'] || $hour !== $config['billing_hour']) {
+    // Resolve target day
+    if ($billingDay === 'last') {
+        $targetDay = (int) $now->format('t'); // last day of current month
+    } else {
+        $targetDay = (int) $billingDay;
+    }
+
+    if ($day !== $targetDay || $hour !== $config['billing_hour']) {
         return false;
     }
 

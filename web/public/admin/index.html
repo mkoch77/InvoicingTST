@@ -110,8 +110,12 @@
             Am konfigurierten Tag wird automatisch ein Snapshot aller Abrechnungsdaten erstellt.
           </p>
           <div class="form-group">
-            <label>Tag des Monats (1-28)</label>
-            <input type="number" id="billing-day" min="1" max="28" value="1" style="width:80px;" />
+            <label>Tag des Monats</label>
+            <select id="billing-day">
+              <option value="1">Erster Tag im Monat</option>
+              <option value="15">15. im Monat</option>
+              <option value="last">Letzter Tag im Monat</option>
+            </select>
           </div>
           <div class="form-group">
             <label>Uhrzeit (Stunde, 0-23)</label>
@@ -587,7 +591,7 @@
       try {
         const res = await fetch('/api/billing-snapshot.php?action=config');
         const cfg = await res.json();
-        document.getElementById('billing-day').value = cfg.billing_day || 1;
+        document.getElementById('billing-day').value = cfg.billing_day || '1';
         document.getElementById('billing-hour').value = cfg.billing_hour || 6;
         document.getElementById('billing-auto').checked = cfg.billing_auto !== false;
       } catch (err) {}
