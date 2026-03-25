@@ -38,24 +38,24 @@ class NetboxClient
         }
 
         while ($url) {
-            $opts = [
-                'http' => [
-                    'method'        => 'GET',
-                    'header'        => implode("\r\n", [
-                        "Authorization: Token {$this->token}",
-                        'Accept: application/json',
-                    ]),
-                    'ignore_errors' => true,
-                    'timeout'       => 30,
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => [
+                    "Authorization: Token {$this->token}",
+                    'Accept: application/json',
                 ],
-            ];
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+            ]);
+            $resp = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-            $ctx  = stream_context_create($opts);
-            $resp = file_get_contents($url, false, $ctx);
-
-            $status = 0;
-            if (isset($http_response_header[0]) && preg_match('/\d{3}/', $http_response_header[0], $m)) {
-                $status = (int) $m[0];
+            if ($curlError) {
+                throw new \RuntimeException("Netbox connection error: {$curlError}");
             }
 
             if ($status >= 400) {
