@@ -183,11 +183,20 @@ function syncNetboxToCmdb(int $limit = 0, string $username = 'system'): array
             // If duplicate serial/name, try to find and update existing
             if (str_contains($errMsg, 'duplicated')) {
                 try {
+                    // Try by name first, then by serial number
+                    $found = [];
                     $search = $client->searchObjects("objectType = \"NetworkDevice\" AND objectSchemaId = 8 AND Name = \"{$name}\"", 0, 1);
                     $found = $search['values'] ?? $search['objectEntries'] ?? [];
+
+                    if (empty($found) && $serial) {
+                        $escapedSerial = str_replace('"', '\\"', $serial);
+                        $search = $client->searchObjects("objectType = \"NetworkDevice\" AND objectSchemaId = 8 AND SerialNumber = \"{$escapedSerial}\"", 0, 1);
+                        $found = $search['values'] ?? $search['objectEntries'] ?? [];
+                    }
+
                     if (!empty($found)) {
                         $existId = (int) $found[0]['id'];
-                        unset($attrs[ATTR_ND_COSTCENTER], $attrs[ATTR_ND_STATUS], $attrs[ATTR_ND_LEASING]);
+                        unset($attrs[ATTR_ND_COSTCENTER], $attrs[ATTR_ND_STATUS], $attrs[ATTR_ND_LEASING], $attrs[ATTR_ND_SERIAL]);
                         $client->updateObject($existId, CMDB_NETWORK_DEVICE_TYPE, $attrs);
                         $updated++;
                         $existingDevices[strtoupper($name)] = $existId;
