@@ -22,6 +22,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $action = $input['action'] ?? $action;
 
+    if ($action === 'sync-cmdb') {
+        requireRole('admin');
+        require_once __DIR__ . '/../../src/netbox_cmdb_sync.php';
+        try {
+            $limit = (int) ($input['limit'] ?? 0);
+            $result = syncNetboxToCmdb($limit, $user['username']);
+            echo json_encode(['message' => "{$result['created']} erstellt, {$result['updated']} aktualisiert, {$result['errors']} Fehler (von {$result['total']} Geräten)"]);
+        } catch (\Exception $e) {
+            AppLogger::error('netbox-cmdb-sync', $e->getMessage(), [], $user['username']);
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($action === 'sync') {
         requireRole('admin');
         require_once __DIR__ . '/../../src/netbox.php';

@@ -31,6 +31,7 @@
         <span id="device-count" class="count"></span>
         <button id="export-btn" class="btn" title="Als Excel/CSV exportieren">&#x2B07; Excel</button>
         <button id="sync-btn" class="btn">Netbox Sync</button>
+        <button id="cmdb-sync-btn" class="btn" title="Netbox → CMDB2 synchronisieren">CMDB Sync (Test: 5)</button>
       </div>
     </div>
     <div class="table-wrap">
@@ -135,6 +136,18 @@
     document.getElementById('sync-btn').addEventListener('click',async()=>{
       const btn=document.getElementById('sync-btn');btn.disabled=true;btn.textContent='Synchronisiere…';
       try{const r=await fetch('/api/netbox.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'sync'})});const d=await r.json();if(d.error)throw new Error(d.error);if(typeof showToast==='function')showToast(d.message,'success');document.getElementById('month-select').innerHTML='<option value="">Laden…</option>';init();}catch(e){if(typeof showToast==='function')showToast(e.message,'error');}finally{btn.disabled=false;btn.textContent='Netbox Sync';}
+    });
+
+    // CMDB Sync
+    document.getElementById('cmdb-sync-btn').addEventListener('click',async()=>{
+      const btn=document.getElementById('cmdb-sync-btn');btn.disabled=true;btn.textContent='Synchronisiere…';
+      try{
+        const r=await fetch('/api/netbox.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'sync-cmdb',limit:5})});
+        const d=await r.json();
+        if(d.error)throw new Error(d.error);
+        if(typeof showToast==='function')showToast(d.message,'success');
+      }catch(e){if(typeof showToast==='function')showToast(e.message,'error');}
+      finally{btn.disabled=false;btn.textContent='CMDB Sync (Test: 5)';}
     });
 
     // Excel/CSV Export

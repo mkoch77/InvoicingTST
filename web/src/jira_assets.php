@@ -49,29 +49,27 @@ class JiraAssetsClient
             'Content-Type: application/json',
         ];
 
-        $opts = [
-            'http' => [
-                'method'        => $method,
-                'header'        => implode("\r\n", $headers),
-                'ignore_errors' => true,
-                'timeout'       => 30,
-            ],
-        ];
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => $method,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
 
         if ($body !== null) {
-            $opts['http']['content'] = json_encode($body);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
         }
 
-        $ctx      = stream_context_create($opts);
-        $response = file_get_contents($url, false, $ctx);
+        $response = curl_exec($ch);
+        $status   = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
 
-        if ($response === false) {
-            throw new \RuntimeException("Jira Assets API request failed: {$url}");
-        }
-
-        $status = 0;
-        if (isset($http_response_header[0]) && preg_match('/\d{3}/', $http_response_header[0], $m)) {
-            $status = (int) $m[0];
+        if ($response === false || $curlErr) {
+            throw new \RuntimeException("Jira Assets API request failed: {$curlErr}");
         }
 
         $data = json_decode($response, true) ?? [];
@@ -137,6 +135,46 @@ class JiraAssetsClient
     public function getObject(int $id): array
     {
         return $this->request('GET', $this->assetsUrl("/object/{$id}"));
+    }
+
+    /**
+     * Create a new object in Assets.
+     */
+    public function createObject(int $objectTypeId, array $attributes): array
+    {
+        $attrList = [];
+        foreach ($attributes as $attrId => $value) {
+            if ($value === null || $value === '') continue;
+            $attrList[] = [
+                'objectTypeAttributeId' => (int) $attrId,
+                'objectAttributeValues' => [['value' => (string) $value]],
+            ];
+        }
+
+        return $this->request('POST', $this->assetsUrl('/object/create'), [
+            'objectTypeId' => $objectTypeId,
+            'attributes'   => $attrList,
+        ]);
+    }
+
+    /**
+     * Update an existing object in Assets.
+     */
+    public function updateObject(int $objectId, int $objectTypeId, array $attributes): array
+    {
+        $attrList = [];
+        foreach ($attributes as $attrId => $value) {
+            if ($value === null) continue;
+            $attrList[] = [
+                'objectTypeAttributeId' => (int) $attrId,
+                'objectAttributeValues' => $value === '' ? [] : [['value' => (string) $value]],
+            ];
+        }
+
+        return $this->request('PUT', $this->assetsUrl("/object/{$objectId}"), [
+            'objectTypeId' => $objectTypeId,
+            'attributes'   => $attrList,
+        ]);
     }
 
     public static function getAttributeValue(array $object, string $attributeName): ?string
