@@ -80,6 +80,10 @@ class JiraAssetsClient
 
         if ($status >= 400) {
             $msg = $data['errorMessages'][0] ?? $data['message'] ?? "HTTP {$status}";
+            $errors = $data['errors'] ?? [];
+            if (!empty($errors)) {
+                $msg .= ' — ' . implode('; ', array_values($errors));
+            }
             throw new \RuntimeException("Jira Assets API error: {$msg}");
         }
 
