@@ -142,7 +142,7 @@ function syncNetboxToCmdb(int $limit = 0, string $username = 'system'): array
         }
 
         $serial = $nb['serial_number'] ?? '';
-        if (!$serial) $serial = '-'; // Required field
+        if (!$serial) $serial = 'NB-' . $name; // Unique fallback per device
 
         $notice = implode(', ', array_filter([
             $nb['site'] ? "Site: {$nb['site']}" : '',
@@ -179,9 +179,27 @@ function syncNetboxToCmdb(int $limit = 0, string $username = 'system'): array
                 $existingDevices[strtoupper($name)] = (int) ($result['id'] ?? 0);
             }
         } catch (\Exception $e) {
+            $errMsg = $e->getMessage();
+            // If duplicate serial/name, try to find and update existing
+            if (str_contains($errMsg, 'duplicated')) {
+                try {
+                    $search = $client->searchObjects("objectType = \"NetworkDevice\" AND objectSchemaId = 8 AND Name = \"{$name}\"", 0, 1);
+                    $found = $search['values'] ?? $search['objectEntries'] ?? [];
+                    if (!empty($found)) {
+                        $existId = (int) $found[0]['id'];
+                        unset($attrs[ATTR_ND_COSTCENTER], $attrs[ATTR_ND_STATUS], $attrs[ATTR_ND_LEASING]);
+                        $client->updateObject($existId, CMDB_NETWORK_DEVICE_TYPE, $attrs);
+                        $updated++;
+                        $existingDevices[strtoupper($name)] = $existId;
+                        continue;
+                    }
+                } catch (\Exception $e2) {
+                    // fall through to error
+                }
+            }
             $errors++;
             if ($errors <= 5) {
-                AppLogger::warn('netbox-cmdb-sync', "Failed '{$name}': " . $e->getMessage(), [], $username);
+                AppLogger::warn('netbox-cmdb-sync', "Failed '{$name}': " . $errMsg, [], $username);
             }
         }
     }
