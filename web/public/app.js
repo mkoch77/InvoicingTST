@@ -78,11 +78,8 @@ function buildSidebar() {
         <a href="/devices.html" class="sidebar-link ${path === '/devices.html' ? 'active' : ''}">
           <span class="icon">&#x1F4F1;</span><span class="label">Notebooks / Clients</span>
         </a>
-        <a href="/switches.html" class="sidebar-link ${path === '/switches.html' ? 'active' : ''}">
-          <span class="icon">&#x1F50C;</span><span class="label">Switches</span>
-        </a>
-        <a href="/accesspoints.html" class="sidebar-link ${path === '/accesspoints.html' ? 'active' : ''}">
-          <span class="icon">&#x1F4E1;</span><span class="label">Access Points</span>
+        <a href="/networking.html" class="sidebar-link ${path === '/networking.html' ? 'active' : ''}">
+          <span class="icon">&#x1F50C;</span><span class="label">Networking</span>
         </a>
       </div>
       <div class="sidebar-section">

@@ -126,21 +126,25 @@ function syncNetboxDevices(string $username = 'system'): array
 
     $switchCount = 0;
     $apCount = 0;
+    $routerCount = 0;
     $skipped = 0;
 
     foreach ($devices as $d) {
         $role = strtolower($d['role']['name'] ?? $d['device_role']['name'] ?? '');
         $roleName = $d['role']['name'] ?? $d['device_role']['name'] ?? '';
 
-        // Classify: switch or access point
+        // Classify: switch, access point, or router
         $category = null;
         $switchRoles = ['switch-ethernet', 'switch-fibrechannel', 'leaf', 'spine', 'border-leaf'];
         $apRoles = ['accesspoint', 'wlc'];
+        $routerRoles = ['router-primary', 'router-secondary'];
         if (in_array($role, $switchRoles) || str_contains($role, 'switch') || str_contains($role, 'leaf') || str_contains($role, 'spine')) {
             $category = 'switch';
         } elseif (in_array($role, $apRoles) || str_contains($role, 'access') || str_contains($role, 'wireless') ||
                   str_contains($role, 'wifi') || str_contains($role, 'wlc')) {
             $category = 'accesspoint';
+        } elseif (in_array($role, $routerRoles) || str_contains($role, 'router')) {
+            $category = 'router';
         }
 
         if (!$category) {
@@ -179,14 +183,16 @@ function syncNetboxDevices(string $username = 'system'): array
         ]);
 
         if ($category === 'switch') $switchCount++;
-        else $apCount++;
+        elseif ($category === 'accesspoint') $apCount++;
+        elseif ($category === 'router') $routerCount++;
     }
 
-    AppLogger::info('netbox-sync', "Sync complete: {$switchCount} switches, {$apCount} APs, {$skipped} skipped ({$currentMonth})", [], $username);
+    AppLogger::info('netbox-sync', "Sync complete: {$switchCount} switches, {$apCount} APs, {$routerCount} routers, {$skipped} skipped ({$currentMonth})", [], $username);
 
     return [
         'switches' => $switchCount,
         'accesspoints' => $apCount,
+        'routers' => $routerCount,
         'skipped' => $skipped,
         'month' => $currentMonth,
     ];

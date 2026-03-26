@@ -47,20 +47,11 @@
 
         <div class="card card-vm">
           <div class="card-icon">&#x1F50C;</div>
-          <h2>Switches</h2>
-          <div id="switch-stats" class="vm-stats">
+          <h2>Networking</h2>
+          <div id="networking-stats" class="vm-stats">
             <div class="vm-stats-loading">Lade Daten…</div>
           </div>
-          <a href="/switches.html" class="card-link">Alle Switches anzeigen &rarr;</a>
-        </div>
-
-        <div class="card card-vm">
-          <div class="card-icon">&#x1F4E1;</div>
-          <h2>Access Points</h2>
-          <div id="ap-stats" class="vm-stats">
-            <div class="vm-stats-loading">Lade Daten…</div>
-          </div>
-          <a href="/accesspoints.html" class="card-link">Alle APs anzeigen &rarr;</a>
+          <a href="/networking.html" class="card-link">Alle Geräte anzeigen &rarr;</a>
         </div>
 
       </div>
@@ -282,37 +273,38 @@
     }
 
     async function renderNetboxStats() {
-      const swContainer = document.getElementById('switch-stats');
-      const apContainer = document.getElementById('ap-stats');
+      const container = document.getElementById('networking-stats');
       try {
         const res = await fetch('/api/netbox.php?action=stats');
         const d = await res.json();
         if (!d.month) {
-          swContainer.innerHTML = '<div class="vm-stats-loading">Keine Daten</div>';
-          apContainer.innerHTML = '<div class="vm-stats-loading">Keine Daten</div>';
+          container.innerHTML = '<div class="vm-stats-loading">Keine Daten</div>';
           return;
         }
-        swContainer.innerHTML = `
+        container.innerHTML = `
           <div class="vm-stats-month">${formatMonth(d.month)}</div>
           <div class="vm-stats-grid">
-            <div class="stat-row stat-total">
+            <a href="/networking.html?category=switch" class="stat-row">
               <span class="stat-label">Switches</span>
               <span class="stat-value">${d.switches}</span>
-            </div>
-          </div>
-        `;
-        apContainer.innerHTML = `
-          <div class="vm-stats-month">${formatMonth(d.month)}</div>
-          <div class="vm-stats-grid">
-            <div class="stat-row stat-total">
+            </a>
+            <a href="/networking.html?category=accesspoint" class="stat-row">
               <span class="stat-label">Access Points</span>
               <span class="stat-value">${d.accesspoints}</span>
-            </div>
+            </a>
+            <a href="/networking.html?category=router" class="stat-row">
+              <span class="stat-label">Router</span>
+              <span class="stat-value">${d.routers}</span>
+            </a>
+            <div class="stat-divider"></div>
+            <a href="/networking.html" class="stat-row stat-total">
+              <span class="stat-label">Gesamt</span>
+              <span class="stat-value">${d.total}</span>
+            </a>
           </div>
         `;
       } catch (e) {
-        swContainer.innerHTML = '<div class="vm-stats-loading">Fehler</div>';
-        apContainer.innerHTML = '<div class="vm-stats-loading">Fehler</div>';
+        container.innerHTML = '<div class="vm-stats-loading">Fehler</div>';
       }
     }
 

@@ -2,11 +2,11 @@
 /**
  * Netbox Device API endpoints.
  *
- * GET  /api/netbox.php?category=switch          – List switches
- * GET  /api/netbox.php?category=accesspoint     – List access points
- * GET  /api/netbox.php?action=months            – Available months
- * GET  /api/netbox.php?action=stats             – Summary stats
- * POST /api/netbox.php { action: "sync" }       – Sync from Netbox
+ * GET  /api/netbox.php                             – All networking devices
+ * GET  /api/netbox.php?category=switch             – Filter by category
+ * GET  /api/netbox.php?action=months               – Available months
+ * GET  /api/netbox.php?action=stats                – Summary stats
+ * POST /api/netbox.php { action: "sync" }          – Sync from Netbox
  */
 
 require_once __DIR__ . '/../../src/middleware.php';
@@ -27,7 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_once __DIR__ . '/../../src/netbox.php';
         try {
             $result = syncNetboxDevices($user['username']);
-            echo json_encode(['message' => "{$result['switches']} Switches, {$result['accesspoints']} Access Points synchronisiert ({$result['month']})"]);
+            $parts = [];
+            if ($result['switches'] > 0) $parts[] = "{$result['switches']} Switches";
+            if ($result['accesspoints'] > 0) $parts[] = "{$result['accesspoints']} Access Points";
+            if ($result['routers'] > 0) $parts[] = "{$result['routers']} Router";
+            echo json_encode(['message' => implode(', ', $parts) . " synchronisiert ({$result['month']})"]);
         } catch (\Exception $e) {
             AppLogger::error('netbox-sync', $e->getMessage(), [], $user['username']);
             http_response_code(500);
@@ -53,24 +57,26 @@ if ($action === 'months') {
 if ($action === 'stats') {
     try {
         $month = $pdo->query("SELECT MAX(export_month) FROM netbox_device")->fetchColumn() ?: '';
-        $stats = ['month' => $month, 'switches' => 0, 'accesspoints' => 0];
+        $stats = ['month' => $month, 'switches' => 0, 'accesspoints' => 0, 'routers' => 0, 'total' => 0];
         if ($month) {
             $s = $pdo->prepare("SELECT category, COUNT(*) AS cnt FROM netbox_device WHERE export_month = :m GROUP BY category");
             $s->execute(['m' => $month]);
             foreach ($s->fetchAll(\PDO::FETCH_ASSOC) as $r) {
                 if ($r['category'] === 'switch') $stats['switches'] = (int) $r['cnt'];
                 if ($r['category'] === 'accesspoint') $stats['accesspoints'] = (int) $r['cnt'];
+                if ($r['category'] === 'router') $stats['routers'] = (int) $r['cnt'];
             }
+            $stats['total'] = $stats['switches'] + $stats['accesspoints'] + $stats['routers'];
         }
         echo json_encode($stats);
     } catch (\Exception $e) {
-        echo json_encode(['month' => '', 'switches' => 0, 'accesspoints' => 0]);
+        echo json_encode(['month' => '', 'switches' => 0, 'accesspoints' => 0, 'routers' => 0, 'total' => 0]);
     }
     exit;
 }
 
-// Default: device list
-$category = $_GET['category'] ?? 'switch';
+// Default: device list (all categories or filtered)
+$category = $_GET['category'] ?? '';
 $month = $_GET['month'] ?? '';
 if (!$month) {
     try {
@@ -81,20 +87,31 @@ if (!$month) {
 }
 
 try {
-    $stmt = $pdo->prepare("
-        SELECT name, device_type, device_role, manufacturer, model, serial_number,
-               asset_tag, site, location, rack, status, primary_ip, tenant, description
-        FROM netbox_device
-        WHERE category = :cat AND export_month = :month
-        ORDER BY site, name
-    ");
-    $stmt->execute(['cat' => $category, 'month' => $month]);
+    if ($category) {
+        $stmt = $pdo->prepare("
+            SELECT name, device_type, device_role, manufacturer, model, serial_number,
+                   asset_tag, site, location, rack, status, primary_ip, tenant, category, description
+            FROM netbox_device
+            WHERE category = :cat AND export_month = :month
+            ORDER BY site, name
+        ");
+        $stmt->execute(['cat' => $category, 'month' => $month]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT name, device_type, device_role, manufacturer, model, serial_number,
+                   asset_tag, site, location, rack, status, primary_ip, tenant, category, description
+            FROM netbox_device
+            WHERE export_month = :month
+            ORDER BY category, site, name
+        ");
+        $stmt->execute(['month' => $month]);
+    }
 
     echo json_encode([
         'month' => $month,
-        'category' => $category,
+        'category' => $category ?: 'all',
         'devices' => $stmt->fetchAll(\PDO::FETCH_ASSOC),
     ]);
 } catch (\Exception $e) {
-    echo json_encode(['month' => $month, 'category' => $category, 'devices' => []]);
+    echo json_encode(['month' => $month, 'category' => $category ?: 'all', 'devices' => []]);
 }

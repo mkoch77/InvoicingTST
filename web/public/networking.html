@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Networking – Accounting</title>
+  <link rel="stylesheet" href="/style.css?v=12">
+</head>
+<body>
+  <div class="container">
+    <div class="page-header">
+      <h1>Networking – Rohdaten</h1>
+      <div class="controls">
+        <label for="month-select">Monat:</label>
+        <select id="month-select"><option value="">Laden…</option></select>
+        <label for="category-filter">Kategorie:</label>
+        <select id="category-filter">
+          <option value="">Alle</option>
+          <option value="switch">Switches</option>
+          <option value="accesspoint">Access Points</option>
+          <option value="router">Router</option>
+        </select>
+        <input type="text" id="search-input" placeholder="Suchen…" />
+        <label for="page-size">Zeilen:</label>
+        <select id="page-size">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="all">Alle</option>
+        </select>
+        <span id="device-count" class="count"></span>
+        <button id="export-btn" class="btn" title="Als Excel/CSV exportieren">&#x2B07; Excel</button>
+        <button id="sync-btn" class="btn">Netbox Sync</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Name</th><th>Kategorie</th><th>Hersteller</th><th>Modell</th><th>Rolle</th>
+          <th>Standort</th><th>Location</th><th>Rack</th><th>IP</th>
+          <th>Seriennr.</th><th>Tenant</th><th>Status</th>
+        </tr></thead>
+        <tbody id="device-rows"><tr><td colspan="12" class="empty">Daten werden geladen…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="pagination" class="pagination"></div>
+  </div>
+  <script src="/app.js?v=12"></script>
+  <script>
+    let allDevices = [], currentPage = 1, currentMonth = '';
+    const categoryLabels = { switch: 'Switch', accesspoint: 'Access Point', router: 'Router' };
+    function esc(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+    function formatMonth(m) { if (!m) return ''; const [y,mo]=m.split('-'); return new Date(y,parseInt(mo)-1).toLocaleDateString('de-DE',{year:'numeric',month:'long'}); }
+
+    // Read category filter from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('category')) {
+      document.getElementById('category-filter').value = urlParams.get('category');
+    }
+
+    async function init() {
+      const res = await fetch('/api/netbox.php?action=months');
+      const months = await res.json();
+      const sel = document.getElementById('month-select');
+      sel.innerHTML = '';
+      for (const m of months.slice(0,6)) { const o=document.createElement('option'); o.value=m; o.textContent=formatMonth(m); sel.appendChild(o); }
+      if (months.length) { currentMonth=months[0]; loadDevices(currentMonth); }
+      else document.getElementById('device-rows').innerHTML='<tr><td colspan="12" class="empty">Keine Daten. "Netbox Sync" ausführen.</td></tr>';
+    }
+
+    async function loadDevices(month) {
+      // Load all categories at once
+      const res = await fetch(`/api/netbox.php?month=${encodeURIComponent(month)}`);
+      const data = await res.json();
+      allDevices = data.devices || [];
+      currentPage = 1; renderTable();
+    }
+
+    function getFiltered() {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      const cat = document.getElementById('category-filter').value;
+      return allDevices.filter(d => {
+        if (cat && d.category !== cat) return false;
+        if (!q) return true;
+        return [d.name,d.manufacturer,d.model,d.device_role,d.site,d.location,d.rack,d.primary_ip,d.serial_number,d.tenant,d.category].join(' ').toLowerCase().includes(q);
+      });
+    }
+
+    function renderTable() {
+      const filtered = getFiltered();
+      const tbody = document.getElementById('device-rows');
+      const ps = document.getElementById('page-size').value;
+      const pageSize = ps==='all' ? filtered.length : parseInt(ps);
+      const totalPages = Math.max(1,Math.ceil(filtered.length/pageSize));
+      if (currentPage>totalPages) currentPage=totalPages;
+      const start=(currentPage-1)*pageSize;
+      const page=filtered.slice(start,start+pageSize);
+
+      // Count by category
+      const cats = {};
+      for (const d of filtered) { cats[d.category] = (cats[d.category]||0)+1; }
+      const countParts = Object.entries(cats).map(([k,v]) => `${v} ${categoryLabels[k]||k}`);
+      document.getElementById('device-count').textContent = `${filtered.length} Geräte` + (countParts.length > 1 ? ` (${countParts.join(', ')})` : '');
+
+      tbody.innerHTML='';
+      if (!page.length) { tbody.innerHTML='<tr><td colspan="12" class="empty">Keine Ergebnisse</td></tr>'; return; }
+      for (const d of page) {
+        const statusColor = d.status==='active'?'color:#4ade80':'';
+        const catLabel = categoryLabels[d.category] || d.category;
+        const catColor = d.category==='switch'?'#60a5fa':d.category==='accesspoint'?'#facc15':d.category==='router'?'#c084fc':'';
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td><strong>${esc(d.name)}</strong></td>
+          <td><span style="color:${catColor};font-weight:500">${esc(catLabel)}</span></td>
+          <td>${esc(d.manufacturer||'')}</td><td>${esc(d.model||'')}</td><td>${esc(d.device_role||'')}</td>
+          <td>${esc(d.site||'')}</td><td>${esc(d.location||'')}</td><td>${esc(d.rack||'')}</td><td style="font-size:.85rem">${esc(d.primary_ip||'')}</td>
+          <td>${esc(d.serial_number||'')}</td><td>${esc(d.tenant||'')}</td><td style="${statusColor}">${esc(d.status||'')}</td>`;
+        tbody.appendChild(tr);
+      }
+      renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+      const pag=document.getElementById('pagination'); pag.innerHTML=''; if(totalPages<=1)return;
+      const addBtn=(l,p,dis,act)=>{const b=document.createElement('button');b.textContent=l;b.className='page-btn'+(act?' active':'');b.disabled=dis;if(!dis&&!act)b.addEventListener('click',()=>{currentPage=p;renderTable();});pag.appendChild(b);};
+      addBtn('\u00AB',1,currentPage===1,false);addBtn('\u2039',currentPage-1,currentPage===1,false);
+      let pages=[];if(totalPages<=7){for(let i=1;i<=totalPages;i++)pages.push(i);}else{pages.push(1);let rs=Math.max(2,currentPage-2),re=Math.min(totalPages-1,currentPage+2);if(currentPage<=3)re=Math.min(totalPages-1,5);if(currentPage>=totalPages-2)rs=Math.max(2,totalPages-4);if(rs>2)pages.push('...');for(let i=rs;i<=re;i++)pages.push(i);if(re<totalPages-1)pages.push('...');pages.push(totalPages);}
+      for(const p of pages){if(p==='...'){const s=document.createElement('span');s.className='page-ellipsis';s.textContent='...';pag.appendChild(s);}else addBtn(String(p),p,false,p===currentPage);}
+      addBtn('\u203A',currentPage+1,currentPage===totalPages,false);addBtn('\u00BB',totalPages,currentPage===totalPages,false);
+    }
+
+    document.getElementById('month-select').addEventListener('change',e=>{currentMonth=e.target.value;loadDevices(currentMonth);});
+    document.getElementById('category-filter').addEventListener('change',()=>{currentPage=1;renderTable();});
+    document.getElementById('search-input').addEventListener('input',()=>{currentPage=1;renderTable();});
+    document.getElementById('page-size').addEventListener('change',()=>{currentPage=1;renderTable();});
+    document.getElementById('sync-btn').addEventListener('click',async()=>{
+      const btn=document.getElementById('sync-btn');btn.disabled=true;btn.textContent='Synchronisiere…';
+      try{const r=await fetch('/api/netbox.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'sync'})});const d=await r.json();if(d.error)throw new Error(d.error);if(typeof showToast==='function')showToast(d.message,'success');document.getElementById('month-select').innerHTML='<option value="">Laden…</option>';init();}catch(e){if(typeof showToast==='function')showToast(e.message,'error');}finally{btn.disabled=false;btn.textContent='Netbox Sync';}
+    });
+
+    // Excel/CSV Export
+    document.getElementById('export-btn').addEventListener('click', () => {
+      const filtered = getFiltered();
+      if (!filtered.length) return;
+      const headers = ['Name', 'Kategorie', 'Hersteller', 'Modell', 'Rolle', 'Standort', 'Location', 'Rack', 'IP', 'Seriennr.', 'Tenant', 'Status'];
+      const rows = filtered.map(d => [d.name, categoryLabels[d.category]||d.category, d.manufacturer||'', d.model||'', d.device_role||'', d.site||'', d.location||'', d.rack||'', d.primary_ip||'', d.serial_number||'', d.tenant||'', d.status||'']);
+      downloadCsv(headers, rows, `Networking_${currentMonth}.csv`);
+    });
+
+    function downloadCsv(headers, rows, filename) {
+      const escape = v => '"' + String(v).replace(/"/g, '""') + '"';
+      const lines = [headers.map(escape).join(';')];
+      for (const row of rows) lines.push(row.map(escape).join(';'));
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    init();
+  </script>
+</body>
+</html>
