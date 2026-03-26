@@ -99,7 +99,8 @@ function syncNetboxToCmdb(int $limit = 0, string $username = 'system'): array
         // ignore
     }
     if (!$defaultCostCenter) {
-        throw new \RuntimeException('Keine CostCenter in CMDB gefunden — kann keine Geräte anlegen (Pflichtfeld)');
+        $defaultCostCenter = 'CMDB2-26500'; // Fallback: CostCenter "100"
+        AppLogger::warn('netbox-cmdb-sync', 'CostCenter lookup failed, using fallback: ' . $defaultCostCenter, [], $username);
     }
 
     // 4. Load Netbox devices from DB
@@ -135,10 +136,9 @@ function syncNetboxToCmdb(int $limit = 0, string $username = 'system'): array
             ?? $modellMap[strtoupper($modelShort)]
             ?? null;
 
-        // Use first available model as fallback if no match
-        if (!$modellKey && !empty($modellMap)) {
-            // Don't set a wrong model — use the "0" placeholder if it exists
-            $modellKey = $modellMap['0'] ?? reset($modellMap);
+        // Fallback: use placeholder model CMDB2-50794 ("0") if no match
+        if (!$modellKey) {
+            $modellKey = !empty($modellMap) ? ($modellMap['0'] ?? reset($modellMap)) : 'CMDB2-50794';
         }
 
         $serial = $nb['serial_number'] ?? '';
